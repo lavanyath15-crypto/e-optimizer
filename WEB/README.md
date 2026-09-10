@@ -1,20 +1,36 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# WEB
 
-# Run and deploy your AI Studio app
+The whole frontend lives here: landing page, login, and the React dashboard, all
+served by one Vite app.
 
-This contains everything you need to run your app locally.
+Start it with:
 
-View your app in AI Studio: https://ai.studio/apps/3f7e5502-7d37-41ee-a997-f88a63db0bfb
+```bash
+npm install
+npm run dev
+```
 
-## Run Locally
+That's http://localhost:3000. Auth needs `backend/.env.local` set up first, which is
+covered in [../backend/README.md](../backend/README.md). Without it the site still
+runs, login just tells you it isn't configured.
 
-**Prerequisites:**  Node.js
+| Route | File |
+|---|---|
+| `/` | `index.html` |
+| `/login.html` | `login.html` |
+| `/privacy.html` | `privacy.html` |
+| `/dashboard/` | `dashboard/index.html` |
 
+## What's where
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+| Path | What's in it |
+|---|---|
+| `src/lib/` | The model forward pass, emission formulas, distillation engine |
+| `src/components/` | Dashboard views and cards |
+| `src/data/` | Process unit definitions and mock plant data |
+| `public/model/ann.json` | The trained network, 2.5 kB, loaded at runtime |
+
+`vite.config.ts` aliases `@backend` to `../backend/src`, so the `backend/` folder has
+to sit next to this one. Build from `fromtend/`, not from here on its own.
+
+Full project docs are in [../README.md](../README.md).
