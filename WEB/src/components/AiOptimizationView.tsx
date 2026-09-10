@@ -1,0 +1,272 @@
+import React, { useMemo, useState } from 'react';
+import { AI_SETPOINTS } from '../data/mockData';
+import { AiOptimizationSetpoint } from '../types';
+import { BrainCircuit, CheckCircle2, Sparkles, Sliders, ArrowRight, RotateCcw, AlertTriangle } from 'lucide-react';
+import {
+  DISTILLATION_SCENARIOS,
+  CURRENT_OPERATION_SCENARIO_ID,
+  PURITY_MIN_PCT,
+  RECOVERY_MIN_PCT,
+  evaluateScenario,
+  classifyScenarios,
+  computeSavings,
+} from '../lib/distillationEngine';
+import { PlantAdvisorCard } from './PlantAdvisorCard';
+
+export const AiOptimizationView: React.FC = () => {
+  const [setpoints, setSetpoints] = useState<AiOptimizationSetpoint[]>(AI_SETPOINTS);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const handleApply = (id: string) => {
+    setSetpoints((prev) =>
+      prev.map((sp) => (sp.id === id ? { ...sp, status: 'applied' } : sp))
+    );
+    setFeedback(`Setpoint command transmitted to Emerson DeltaV DCS controller.`);
+    setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const handleRevert = (id: string) => {
+    setSetpoints((prev) =>
+      prev.map((sp) => (sp.id === id ? { ...sp, status: 'pending' } : sp))
+    );
+    setFeedback(`Restored previous engineering manual setpoint.`);
+    setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const distillationResults = useMemo(
+    () => classifyScenarios(DISTILLATION_SCENARIOS.map(evaluateScenario)),
+    []
+  );
+
+  const baseline = distillationResults.find((r) => r.id === CURRENT_OPERATION_SCENARIO_ID)!;
+  const recommended = distillationResults.find((r) => r.classification === 'Energy_Efficient');
+  const savings = recommended ? computeSavings(baseline, recommended) : null;
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[#e0e3e6]/60">
+        <div>
+          <span className="text-xs font-bold uppercase tracking-wider text-[#0f6e8c] bg-[#0f6e8c]/10 px-2.5 py-0.5 rounded-full">
+            Autonomous Closed-Loop Control
+          </span>
+          <h2 className="text-3xl font-extrabold text-[#191c1e] tracking-tight mt-1">
+            AI Optimization & Setpoints
+          </h2>
+          <p className="text-xs text-[#45464f] mt-1">
+            Setpoints worth changing today, with the steam saving next to each one so you can decide if it's worth the trouble.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#3d93ad]/10 border border-[#3d93ad]/30 rounded-lg text-xs font-bold text-[#0f6e8c]">
+          <BrainCircuit className="w-4 h-4" />
+          <span>Model: Industrial-Thermo-v4.2</span>
+        </div>
+      </div>
+
+      {feedback && (
+        <div className="p-4 bg-[#2D6A4F]/10 border border-[#2D6A4F]/30 rounded-xl text-xs font-bold text-[#2D6A4F] flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>{feedback}</span>
+        </div>
+      )}
+
+      {/* Setpoints Table/Cards */}
+      <div className="space-y-4">
+        {setpoints.map((sp) => {
+          const isApplied = sp.status === 'applied';
+
+          return (
+            <div
+              key={sp.id}
+              className={`p-6 rounded-xl border transition-all ${
+                isApplied
+                  ? 'bg-white border-[#2D6A4F]/40 shadow-xs'
+                  : 'bg-white border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)]'
+              }`}
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1 max-w-xl">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-[#061449]">
+                      {sp.parameter}
+                    </h3>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        isApplied
+                          ? 'bg-[#2D6A4F]/15 text-[#2D6A4F]'
+                          : 'bg-[#FFB703]/20 text-[#8a6100]'
+                      }`}
+                    >
+                      {isApplied ? 'Closed Loop: Engaged' : 'AI Recommendation Available'}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-[#2D6A4F] font-semibold flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Gain: {sp.expectedGain}</span>
+                  </p>
+
+                  <p className="text-xs text-[#767680]">
+                    Safety Boundary: {sp.safetyMargin} • Confidence: <strong>{sp.confidence}%</strong>
+                  </p>
+                </div>
+
+                {/* Values Comparison */}
+                <div className="flex items-center gap-6">
+                  <div className="text-center">
+                    <span className="text-[11px] text-[#767680] block">Current</span>
+                    <span className="text-xl font-extrabold font-mono text-[#45464f]">
+                      {sp.currentValue} <span className="text-xs font-normal">{sp.unit}</span>
+                    </span>
+                  </div>
+
+                  <ArrowRight className="w-4 h-4 text-[#3d93ad]" />
+
+                  <div className="text-center">
+                    <span className="text-[11px] text-[#0f6e8c] font-bold block">Optimized</span>
+                    <span className="text-xl font-extrabold font-mono text-[#0f6e8c]">
+                      {sp.recommendedValue} <span className="text-xs font-normal">{sp.unit}</span>
+                    </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div>
+                    {isApplied ? (
+                      <button
+                        onClick={() => handleRevert(sp.id)}
+                        className="px-4 py-2 border border-[#c6c5d1] text-[#45464f] hover:bg-[#eceef1] rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Revert</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleApply(sp.id)}
+                        className="px-5 py-2.5 bg-[#0f6e8c] hover:bg-[#0b5670] text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Apply Setpoint</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Distillation Scenario Optimizer */}
+      <div className="bg-white rounded-xl border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] p-6 space-y-5">
+        <div>
+          <h3 className="text-base font-bold text-[#061449]">Distillation Scenario Optimizer</h3>
+          <p className="text-xs text-[#767680] mt-1">
+            The cheapest reflux setting usually isn't the one you can run. We check every option against
+            purity ≥ {PURITY_MIN_PCT}% and recovery ≥ {RECOVERY_MIN_PCT}% first, then pick the lowest-steam one
+            that actually clears both.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="text-left text-[#767680] border-b border-[#e0e3e6]">
+                <th className="py-2 pr-4 font-bold">Scenario</th>
+                <th className="py-2 pr-4 font-bold">Reflux</th>
+                <th className="py-2 pr-4 font-bold">Steam (kg/day)</th>
+                <th className="py-2 pr-4 font-bold">Specific Steam (kg/kL)</th>
+                <th className="py-2 pr-4 font-bold">Recovery %</th>
+                <th className="py-2 pr-4 font-bold">Purity %</th>
+                <th className="py-2 pr-4 font-bold">CO2e (kg/day)</th>
+                <th className="py-2 pr-4 font-bold">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {distillationResults.map((r) => (
+                <tr
+                  key={r.id}
+                  className={`border-b border-[#e0e3e6]/60 ${
+                    r.classification === 'Energy_Efficient' ? 'bg-[#2D6A4F]/5' : ''
+                  }`}
+                >
+                  <td className="py-2.5 pr-4 font-bold text-[#061449]">
+                    {r.id}
+                    {r.id === CURRENT_OPERATION_SCENARIO_ID && (
+                      <span className="ml-1.5 text-[10px] font-normal text-[#767680]">(current)</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 pr-4 font-mono">{r.refluxRatio.toFixed(1)}</td>
+                  <td className="py-2.5 pr-4 font-mono">{r.steamKgDay.toLocaleString()}</td>
+                  <td className="py-2.5 pr-4 font-mono">{r.specificSteamKgPerKl.toFixed(1)}</td>
+                  <td className={`py-2.5 pr-4 font-mono ${!r.recoveryOk ? 'text-[#BA1A1A] font-bold' : ''}`}>
+                    {r.recoveryPct.toFixed(1)}
+                  </td>
+                  <td className={`py-2.5 pr-4 font-mono ${!r.purityOk ? 'text-[#BA1A1A] font-bold' : ''}`}>
+                    {r.purityPct.toFixed(2)}
+                  </td>
+                  <td className="py-2.5 pr-4 font-mono">{r.co2eKgDay.toFixed(0)}</td>
+                  <td className="py-2.5 pr-4">
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        r.classification === 'Energy_Efficient'
+                          ? 'bg-[#2D6A4F]/15 text-[#2D6A4F]'
+                          : r.classification === 'Constraint_Violation'
+                          ? 'bg-[#BA1A1A]/10 text-[#BA1A1A]'
+                          : 'bg-[#eceef1] text-[#45464f]'
+                      }`}
+                    >
+                      {r.classification === 'Energy_Efficient'
+                        ? 'Recommended'
+                        : r.classification === 'Constraint_Violation'
+                        ? 'Constraint Violation'
+                        : 'Feasible'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {recommended && savings && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 border-t border-[#e0e3e6]">
+            <div>
+              <span className="text-[11px] text-[#767680] block">Steam Reduction</span>
+              <span className="text-lg font-extrabold font-mono text-[#0f6e8c]">
+                {savings.steamSavedPct.toFixed(1)}%
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] text-[#767680] block">Energy Saved</span>
+              <span className="text-lg font-extrabold font-mono text-[#0f6e8c]">
+                {savings.energySavedGjDay.toFixed(1)} GJ/day
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] text-[#767680] block">CO2e Saved</span>
+              <span className="text-lg font-extrabold font-mono text-[#2D6A4F]">
+                {savings.co2eSavedKgDay.toFixed(0)} kg/day
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] text-[#767680] block">Annualized CO2e</span>
+              <span className="text-lg font-extrabold font-mono text-[#2D6A4F]">
+                {savings.co2eSavedTonnesYear.toFixed(1)} t/yr
+              </span>
+            </div>
+          </div>
+        )}
+
+        <p className="text-[10px] text-[#767680] pt-1 border-t border-[#e0e3e6]">
+          CO2e here assumes natural gas at 56.1 kg CO2e/GJ until you confirm your actual fuel. The purity and
+          recovery limits are study defaults too. Put your own numbers in before any of this goes in a report.
+        </p>
+      </div>
+
+      <PlantAdvisorCard
+        scenarios={distillationResults}
+        currentRefluxRatio={baseline.refluxRatio}
+      />
+    </div>
+  );
+};

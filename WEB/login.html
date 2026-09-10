@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account : E-OPTIMIZER Operator Platform</title>
+  <meta name="description" content="Sign in or create an E-Optimizer account." />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800;900&display=swap" rel="stylesheet" />
+  
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="login-body">
+
+  <!-- CAD Background Grid & Precision Crosshairs -->
+  <div class="cad-grid-layer" aria-hidden="true">
+    <span class="cad-crosshair ch-tl">+</span>
+    <span class="cad-crosshair ch-tr">+</span>
+    <span class="cad-crosshair ch-bl">+</span>
+    <span class="cad-crosshair ch-br">+</span>
+    <div class="cad-vertical-line vl-left"></div>
+    <div class="cad-vertical-line vl-right"></div>
+  </div>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-left">
+        <a href="index.html" class="brand-block">
+          <span class="brand-title">E-OPTIMIZER</span>
+          <span class="brand-subtitle">AI ENERGY & CARBON INTELLIGENCE</span>
+        </a>
+      </div>
+
+      <div class="header-center">
+        <span class="telemetry-tag">PORTAL ENCRYPTION: TLS 1.3 / MODBUS AUTH</span>
+      </div>
+
+      <div class="header-right">
+        <a href="index.html" class="btn-nav-link">&lt;- Back to Overview</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Login Form Container -->
+  <main class="login-container">
+    <div class="login-card">
+      <div class="login-card-header">
+        <div class="cad-tag">SYSTEM ACCESS</div>
+        <h1 class="login-card-title" id="auth-title">Welcome back</h1>
+        <p class="login-card-desc">
+          Sign in to pick up where your plant left off, or create an account if you're new here.
+        </p>
+      </div>
+
+      <div class="auth-mode-switch" role="tablist" aria-label="Account access mode">
+        <button type="button" class="auth-mode-btn active" id="sign-in-btn" role="tab" aria-selected="true">Sign in</button>
+        <button type="button" class="auth-mode-btn" id="sign-up-btn" role="tab" aria-selected="false">Sign up</button>
+      </div>
+
+      <form class="login-form" id="login-form">
+        <div class="form-field signup-only" id="name-field" hidden>
+          <label for="user-name">Name</label>
+          <input type="text" id="user-name" placeholder="Your name" autocomplete="name" />
+        </div>
+
+        <div class="form-field">
+          <label for="user-email">Email</label>
+          <input type="email" id="user-email" placeholder="you@example.com" required autocomplete="email" />
+        </div>
+
+        <div class="form-field">
+          <label for="user-password">Password</label>
+          <input type="password" id="user-password" placeholder="Enter your password" required autocomplete="current-password" />
+        </div>
+
+        <div class="login-remember-row signin-only">
+          <label class="remember-check-label">
+            <input type="checkbox" id="remember-device" />
+            <span>Remember me</span>
+          </label>
+          <a href="#" class="forgot-link" id="reset-password-btn">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn-primary full-width" id="login-submit-btn">
+          <span>Sign in</span>
+        </button>
+
+        <div class="form-success-alert" id="login-success-alert" style="display: none;">
+          <span class="cad-code">AUTHENTICATION VERIFIED</span>
+          <p>You're in. Taking you to your plant now...</p>
+        </div>
+
+        <div class="form-error-alert" id="login-error-alert" role="alert" style="display: none;">
+          <span class="cad-code">AUTHENTICATION FAILED</span>
+          <p></p>
+        </div>
+      </form>
+
+      <div class="login-card-footer">
+        <div class="login-status-indicator">
+          <span class="status-indicator-dot"></span>
+          <span>GATEWAY STATUS: ALL SENSORS & MODBUS TCP CONNECTED</span>
+        </div>
+        <div class="login-legal-links">
+          <a href="privacy.html">Privacy Policy</a>
+          <span class="cad-sep">/</span>
+          <a href="privacy.html#terms">Terms of Service</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer login-minimal-footer">
+    <div class="footer-inner">
+      <div class="footer-bottom-row">
+        <span class="footer-copy">(C) 2026 E-OPTIMIZER SYSTEMS. INDUSTRIAL INTELLIGENCE.</span>
+        <div class="footer-links-inline">
+          <a href="privacy.html">Privacy Policy</a>
+          <span class="cad-sep">/</span>
+          <a href="privacy.html#terms">Terms of Service</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

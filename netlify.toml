@@ -1,0 +1,17 @@
+# Netlify build settings.
+#
+# base = "WEB" because that is where package.json lives, but the whole repo is
+# checked out first, so the build can still reach ../backend. Deploying the WEB
+# folder on its own will fail: vite.config.ts resolves @backend to ../backend/src.
+
+[build]
+  base = "WEB"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the Netlify UI under
+# Site settings > Environment variables. They are read at build time and baked
+# into the bundle. Do not commit them.

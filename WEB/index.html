@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E-OPTIMIZER : AI Energy & Carbon Intelligence</title>
+  <meta name="description" content="AI-powered intelligence for smarter ethanol production. E-Optimizer continuously analyzes process data, energy consumption and carbon intensity." />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800;900&display=swap" rel="stylesheet" />
+  
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- CAD Background Grid & Precision Crosshairs -->
+  <div class="cad-grid-layer" aria-hidden="true">
+    <span class="cad-crosshair ch-tl">+</span>
+    <span class="cad-crosshair ch-tr">+</span>
+    <span class="cad-crosshair ch-bl">+</span>
+    <span class="cad-crosshair ch-br">+</span>
+    <div class="cad-vertical-line vl-left"></div>
+    <div class="cad-vertical-line vl-right"></div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-left">
+        <a href="index.html" class="brand-block">
+          <span class="brand-title">E-OPTIMIZER</span>
+          <span class="brand-subtitle">AI ENERGY & CARBON INTELLIGENCE</span>
+        </a>
+      </div>
+
+      <div class="header-center">
+        <span class="telemetry-tag">FACILITY STATUS: CONTINUOUS ANALYSIS ACTIVE</span>
+      </div>
+
+      <div class="header-right">
+        <a href="login.html" class="btn-nav-link" id="login-nav-btn">Login</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO SECTION (First Screen / Single Viewport Composition) -->
+    <section class="hero-section" id="hero">
+      <!-- Measurement / Engineering Line Top -->
+      <div class="cad-measure-bar mb-top">
+        <span class="cad-tick"></span>
+        <span class="cad-code">REF // OPT-2026.4</span>
+        <span class="cad-line"></span>
+        <span class="cad-code">LAT 41.8781 N, LONG 87.6298 W</span>
+        <span class="cad-tick"></span>
+      </div>
+
+      <!-- Huge Subtle Typographic Background -->
+      <div class="bg-typo-wrap" aria-hidden="true">
+        <div class="bg-typo-text" id="bg-typo">ETHANOL</div>
+      </div>
+
+      <!-- Center 3D Visual with Parallax Physics -->
+      <div class="hero-stage-container" id="hero-stage">
+        <div class="floating-island-wrap" id="floating-island">
+          <!-- Translucent Floating Technical Glass Cubes -->
+          <div class="glass-cube glass-cube-left" id="cube-left">
+            <div class="cube-inner">
+              <span class="cube-label">CO2e / L</span>
+            </div>
+          </div>
+          <div class="glass-cube glass-cube-right" id="cube-right">
+            <div class="cube-inner">
+              <span class="cube-label">MJ / L</span>
+            </div>
+          </div>
+          <div class="glass-cube glass-cube-mini" id="cube-mini"></div>
+          <div class="glass-cube glass-cube-top" id="cube-top"></div>
+
+          <!-- Central 3D Sculpture -->
+          <div class="rock-image-wrapper">
+            <img 
+              src="assets/floating_eco_rock.jpg" 
+              alt="E-Optimizer sustainable process intelligence 3D visual" 
+              class="floating-rock-img" 
+              id="rock-img"
+              loading="eager" 
+            />
+            <div class="rock-shadow"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero Content Lower Row (Left: Headline & Description | Right: Latest Intelligence) -->
+      <div class="hero-bottom-grid">
+        <!-- Hero Left Column -->
+        <div class="hero-content-left">
+          <h1 class="hero-headline">
+            OPTIMIZE<br />
+            EVERY DROP.
+          </h1>
+
+          <div class="section-tag">
+            <span class="tag-accent"></span>
+            <span class="tag-text">CUT THE STEAM. KEEP THE YIELD.</span>
+          </div>
+          
+          <p class="hero-description">
+            Your column is probably burning more steam than it needs to right now. We watch every stage, work out the lowest-energy settings that still hit your purity and recovery targets, and tell you exactly what to change. In kilograms of steam per litre, not vague percentages.
+          </p>
+
+          <div class="hero-cta-row">
+            <a href="#about" class="btn-primary">Explore E-Optimizer -></a>
+            <span class="cad-inline-ref">TARGET: MIN-ENERGY / MIN-CARBON</span>
+          </div>
+        </div>
+
+        <!-- Hero Right Column: Latest Intelligence Block -->
+        <div class="hero-content-right">
+          <div class="intelligence-card">
+            <div class="card-header">
+              <span class="card-title">LATEST INTELLIGENCE</span>
+              <span class="card-ref">[SYSTEM 04]</span>
+            </div>
+            <ul class="intelligence-list">
+              <li class="intel-item">
+                <span class="intel-dot"></span>
+                <span class="intel-name">Energy Optimization</span>
+              </li>
+              <li class="intel-item">
+                <span class="intel-dot"></span>
+                <span class="intel-name">Carbon Intelligence</span>
+              </li>
+              <li class="intel-item">
+                <span class="intel-dot"></span>
+                <span class="intel-name">Process Monitoring</span>
+              </li>
+              <li class="intel-item">
+                <span class="intel-dot"></span>
+                <span class="intel-name">AI Recommendations</span>
+              </li>
+            </ul>
+            <div class="card-footer-metric">
+              <span class="metric-label">OPERATING BASIS</span>
+              <span class="metric-value">kg steam / L ethanol</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Measurement Axis -->
+      <div class="cad-measure-bar mb-bottom">
+        <span class="cad-tick"></span>
+        <span class="cad-code">SEC: MILLING -> LIQUEFACTION -> SACCHARIFICATION -> FERMENTATION -> DISTILLATION -> MEE -> DRYING</span>
+        <span class="cad-line"></span>
+        <span class="cad-code">E-OPT // V2.6</span>
+        <span class="cad-tick"></span>
+      </div>
+    </section>
+
+    <!-- SECTION: ABOUT E-OPTIMIZER SYSTEM -->
+    <section class="content-section" id="about">
+      <div class="section-container">
+        
+        <!-- Section Header -->
+        <div class="content-header">
+          <div class="cad-tag">SYSTEM OVERVIEW</div>
+          <h2 class="content-title">Burn Less Steam Making the Same Ethanol</h2>
+          <p class="content-lead">
+We don't capture carbon. We stop you making it. Every litre of ethanol has a lowest-energy way to produce it, and that number moves all day as your feedstock and steam header shift. We find it, continuously, without letting purity or recovery slip.
+          </p>
+        </div>
+
+        <!-- 3 Core Tenets Grid -->
+        <div class="concept-grid">
+          <div class="concept-card">
+            <div class="card-index">01 / THE PROBLEM</div>
+            <h3 class="card-heading">Every Truckload Changes the Maths</h3>
+            <p class="card-text">
+              Moisture shifts. Starch shifts. Particle size shifts. Every load that hits your hammermill is slightly different from the last one, and meanwhile your steam header, enzyme activity and reflux ratio are all drifting too. So the same litre of ethanol can cost you wildly different amounts of energy depending on the hour, and nobody on shift has time to retune for it.
+            </p>
+            <div class="card-footline">Variable Feed -> Changing Yield -> Unnecessary Steam</div>
+          </div>
+
+          <div class="concept-card">
+            <div class="card-index">02 / THE ARCHITECTURE</div>
+            <h3 class="card-heading">It Plugs Into What You Already Have</h3>
+            <p class="card-text">
+              No rip and replace. We read your existing SCADA, PLC and Modbus registers, so the data you're already collecting starts earning its keep. The loop runs itself: <strong>Measure -> Understand -> Predict -> Optimize -> Recommend -> Validate</strong>, then round again with whatever changed.
+            </p>
+            <div class="card-footline">SCADA/IoT -> ML Prediction -> Optimization -> LLM Advisory</div>
+          </div>
+
+          <div class="concept-card">
+            <div class="card-index">03 / SOURCE REDUCTION</div>
+            <h3 class="card-heading">Cheaper Than Capturing It Later</h3>
+            <p class="card-text">
+              Capture kit cleans up after you've already burned the fuel. You pay for the gas, then pay again to catch what comes out. Burn less instead and the saving lands twice: on your fuel bill and on your carbon intensity. No extra equipment, no parasitic load, and it doesn't stop working the day the capture unit goes down for maintenance.
+            </p>
+            <div class="card-footline">Primary KPI: kg CO2e / L ethanol & MJ / L ethanol</div>
+          </div>
+        </div>
+
+        <!-- Detailed Process Table -->
+        <div class="process-table-section">
+          <div class="table-header-row">
+            <div>
+              <span class="cad-tag">PROCESS INTELLIGENCE</span>
+              <h3 class="sub-section-title">Critical Unit Operations Analyzed</h3>
+            </div>
+            <div class="cad-coord-label">DATA CHANNELS: 24V DC / RS485 / MODBUS TCP / MQTT</div>
+          </div>
+
+          <div class="process-rows-wrap">
+            <div class="process-row">
+              <div class="pr-col pr-id">STAGE 01</div>
+              <div class="pr-col pr-name">Milling & Liquefaction</div>
+              <div class="pr-col pr-desc">Grind too coarse and starch walks out with the DDGS. Grind too fine and you fight viscosity all the way through liquefaction. We read particle spread and slurry solids, then tell you the enzyme dose and hold time that convert the most starch for the least steam.</div>
+              <div class="pr-col pr-kpi">Viscosity vs Steam (kg/h)</div>
+            </div>
+
+            <div class="process-row">
+              <div class="pr-col pr-id">STAGE 02</div>
+              <div class="pr-col pr-name">Fermentation Monitoring</div>
+              <div class="pr-col pr-desc">A batch that sits two hours longer than it needs to is two hours of chilling you didn't have to pay for. We track yeast viability, pH drift and CO2 rate to spot when fermentation is genuinely finished, so you drop the tank on time and still hit your ABV.</div>
+              <div class="pr-col pr-kpi">Yield / Residence Time</div>
+            </div>
+
+            <div class="process-row">
+              <div class="pr-col pr-id">STAGE 03</div>
+              <div class="pr-col pr-name">Distillation Optimization</div>
+              <div class="pr-col pr-desc">This is where your steam goes. Most of it. We watch column temperatures, feed flow, reflux and bottom loss, then turn all of it into one number you can argue with: kilograms of steam per litre of pure ethanol.</div>
+              <div class="pr-col pr-kpi">Steam Intensity (kg steam / L)</div>
+            </div>
+
+            <div class="process-row">
+              <div class="pr-col pr-id">STAGE 04</div>
+              <div class="pr-col pr-name">MEE & DDGS Drying</div>
+              <div class="pr-col pr-desc">Overdrying DDGS means burning gas to remove water you were allowed to sell. We follow evaporator duty, fouling and exhaust temperature so you land on your moisture spec instead of sailing past it.</div>
+              <div class="pr-col pr-kpi">Thermal Duty / kg DDGS</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SECTION: AI ADVISORY & OPTIMIZATION ENGINE -->
+    <section class="content-section" id="advisory">
+      <div class="section-container">
+
+        <div class="content-header">
+          <div class="cad-tag">OPTIMIZATION INTELLIGENCE</div>
+          <h2 class="content-title">From Raw Telemetry to Explainable Recommendations</h2>
+          <p class="content-lead">
+            Underneath, three separate models handle prediction, optimization and carbon accounting. Your operator sees none of that. They get one recommendation and the reason behind it, which is the only part that helps at 3am.
+          </p>
+        </div>
+
+        <div class="concept-grid">
+          <div class="concept-card">
+            <div class="card-index">04 / PREDICTIVE MODELS</div>
+            <h3 class="card-heading">Yield, Energy & Carbon Prediction</h3>
+            <p class="card-text">
+              When energy climbs, the useful question isn't whether the plant is off. It's which stage. Models trained on your own operating history predict yield, specific energy and carbon intensity for any process state, so you get pointed at the column or the dryer instead of at the whole facility.
+            </p>
+            <div class="card-footline">Gradient boosting, time-series forecasting, anomaly detection</div>
+          </div>
+
+          <div class="concept-card">
+            <div class="card-index">05 / MULTI-OBJECTIVE OPTIMIZATION</div>
+            <h3 class="card-heading">Feasible Trade-offs, Not a Single Answer</h3>
+            <p class="card-text">
+              Push yield up and energy follows it. Push energy down and recovery starts to slip. All three fight each other, so the engine searches inside your real constraints and hands back settings you can actually dial in, not an optimum that quietly breaks your purity spec.
+            </p>
+            <div class="card-footline">Bounded by process, safety & quality constraints</div>
+          </div>
+
+          <div class="concept-card">
+            <div class="card-index">06 / EXPLAINABLE ADVISORY</div>
+            <h3 class="card-heading">Ask The Plant Directly</h3>
+            <p class="card-text">
+              Every recommendation shows its working: which variable moved, by how much, and what happened downstream. Ask why steam climbed this morning, or what another 5 t/day of grain would cost you in carbon intensity, and you get a sentence back. Not another chart to decode.
+            </p>
+            <div class="card-footline">Natural-language queries, what-if simulation</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-top-row">
+        <div class="footer-brand-col">
+          <span class="footer-brand-title">E-OPTIMIZER</span>
+          <span class="footer-brand-sub">AI ENERGY & CARBON INTELLIGENCE</span>
+          <p class="footer-text">
+            We help grain-to-ethanol plants make the same litre for less steam, less power and less CO2e. That's the whole job.
+          </p>
+        </div>
+
+        <div class="footer-nav-col">
+          <span class="footer-nav-heading">SYSTEM NAVIGATION</span>
+          <a href="#hero">Overview</a>
+          <a href="#about">Process Architecture</a>
+          <a href="#advisory">AI Advisory</a>
+          <a href="login.html">Plant Operator Login</a>
+        </div>
+
+        <div class="footer-legal-col">
+          <span class="footer-nav-heading">LEGAL & COMPLIANCE</span>
+          <a href="privacy.html">Privacy Policy</a>
+          <a href="privacy.html#terms">Terms of Service</a>
+          <a href="privacy.html#security">Industrial Data Security</a>
+          <a href="privacy.html#telemetry">Telemetry Boundaries</a>
+        </div>
+      </div>
+
+      <div class="footer-bottom-row">
+        <span class="footer-copy">(C) 2026 E-OPTIMIZER SYSTEMS. ALL RIGHTS RESERVED.</span>
+        <span class="footer-cad">LAT 41.8781 N, LONG 87.6298 W // PLANT SYSTEM 04</span>
+        <div class="footer-links-inline">
+          <a href="privacy.html">Privacy Policy</a>
+          <span class="cad-sep">/</span>
+          <a href="privacy.html#terms">Terms</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- DEMO REQUEST MODAL / DRAWER -->
+  <div class="modal-overlay" id="demo-modal" aria-hidden="true">
+    <div class="modal-backdrop" id="demo-backdrop"></div>
+    <div class="modal-drawer" role="dialog" aria-labelledby="modal-title">
+      <div class="drawer-header">
+        <div>
+          <span class="cad-tag">FACILITY ENGAGEMENT</span>
+          <h3 class="drawer-title" id="modal-title">Book a Technical Demo</h3>
+        </div>
+        <button class="btn-close-drawer" id="close-demo-btn" aria-label="Close demo booking drawer">X</button>
+      </div>
+
+      <form class="demo-form" id="demo-form" onsubmit="return false;">
+        <div class="form-field">
+          <label for="demo-name">Plant Technical Lead / Operator Name</label>
+          <input type="text" id="demo-name" placeholder="Robert Vance, Lead Process Engineer" required />
+        </div>
+
+        <div class="form-field">
+          <label for="demo-facility">Facility Name & Location</label>
+          <input type="text" id="demo-facility" placeholder="Midwest Bio-Energy Plant #02, Iowa" required />
+        </div>
+
+        <div class="form-field">
+          <label for="demo-email">Enterprise Work Email</label>
+          <input type="email" id="demo-email" placeholder="r.vance@bioenergy-midwest.com" required />
+        </div>
+
+        <div class="form-field">
+          <label for="demo-capacity">Annual Plant Capacity</label>
+          <select id="demo-capacity">
+            <option value="sub-50">Under 50 Million Gallons / Year</option>
+            <option value="50-100">50 - 100 Million Gallons / Year</option>
+            <option value="100-plus">100+ Million Gallons / Year</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label for="demo-notes">Priority Optimization Focus</label>
+          <textarea id="demo-notes" rows="3" placeholder="Specify interest: Distillation steam reduction, DDGS drying fuel efficiency, or carbon intensity accounting..."></textarea>
+        </div>
+
+        <button type="submit" class="btn-primary full-width" id="submit-demo-btn">Submit Request -></button>
+
+        <div class="form-success-alert" id="demo-success-alert" style="display: none;">
+          <span class="cad-code">REQUEST CONFIRMED</span>
+          <p>You're booked in. Someone who knows plants will get in touch about hooking up to your historian, and they'll want to know what you're running.</p>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

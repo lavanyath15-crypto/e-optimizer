@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment files. Never commit real credentials.
+.env
+.env.*
+!.env.example
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+*.log
+.vscode/*
+!.vscode/extensions.json
+
+# Editor scratch space, not part of this project
+WEB/.vscode/
+
+# Superseded by the merge into WEB/. Kept on disk as a backup, not deployed.
+E-optimizer-sliding-page/
