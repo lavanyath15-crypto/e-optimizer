@@ -5,6 +5,10 @@ node_modules/
 dist/
 build/
 
+# Python bytecode
+__pycache__/
+*.py[cod]
+
 # Environment files. Never commit real credentials.
 .env
 .env.*

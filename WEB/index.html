@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>E-OPTIMIZER : AI Energy & Carbon Intelligence</title>
-  <meta name="description" content="AI-powered intelligence for smarter ethanol production. E-Optimizer continuously analyzes process data, energy consumption and carbon intensity." />
+  <meta name="description" content="AI-powered intelligence for smarter ethanol production. E-Optimizer continuously analyzes process data, energy consumption and carbon intensity, and answers questions by voice." />
   
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -139,6 +139,10 @@
               <li class="intel-item">
                 <span class="intel-dot"></span>
                 <span class="intel-name">AI Recommendations</span>
+              </li>
+              <li class="intel-item">
+                <span class="intel-dot"></span>
+                <span class="intel-name">Voice Assistance</span>
               </li>
             </ul>
             <div class="card-footer-metric">
@@ -289,6 +293,83 @@ We don't capture carbon. We stop you making it. Every litre of ethanol has a low
 
       </div>
     </section>
+
+    <!-- SECTION: VOICE INTERFACE -->
+    <section class="content-section" id="voice">
+      <div class="section-container">
+
+        <div class="content-header">
+          <div class="cad-tag">VOICE INTERFACE</div>
+          <h2 class="content-title">Ask It Out Loud, Gloves On</h2>
+          <p class="content-lead">
+            Nobody types on a walkway. The assistant takes spoken questions and answers back out loud, using the speech engine already built into the browser. No handset, no licence, no extra box on the plant network.
+          </p>
+        </div>
+
+        <div class="concept-grid">
+          <div class="concept-card">
+            <div class="card-index">07 / HANDS FREE</div>
+            <h3 class="card-heading">Say "Hey Optimizer"</h3>
+            <p class="card-text">
+              A background listener sits on the wake phrase and nothing else. Say it and the assistant opens with the microphone already live, so a question you thought of on the stairs doesn't have to survive the walk back to the desk. There's a switch for it in the assistant header: on by default, off in one click.
+            </p>
+            <div class="card-footline">Wake phrase -> drawer opens -> microphone live</div>
+          </div>
+
+          <div class="concept-card">
+            <div class="card-index">08 / SPOKEN QUESTIONS</div>
+            <h3 class="card-heading">Your Words Land In The Box</h3>
+            <p class="card-text">
+              Press the microphone and the question appears as you say it, then sends itself the moment you stop talking. Same question, same answer, same refusal to invent a figure it cannot see. Voice is another way in, not a second assistant with looser standards.
+            </p>
+            <div class="card-footline">Live transcript -> auto-submit -> same advisory engine</div>
+          </div>
+
+          <div class="concept-card">
+            <div class="card-index">09 / SPOKEN ANSWERS</div>
+            <h3 class="card-heading">Units That Survive Being Read</h3>
+            <p class="card-text">
+              Replies are read back automatically, with the units expanded first. <strong>412.8 kg CO2e/kL</strong> comes out as "412.8 kilograms of C O 2 equivalent per kilolitre", not spelled letter by letter with a slash in the middle of it. One button stops it mid-sentence when you've heard enough.
+            </p>
+            <div class="card-footline">Automatic playback, interruptible, errors stay unspoken</div>
+          </div>
+        </div>
+
+        <div class="process-table-section">
+          <div class="table-header-row">
+            <div>
+              <span class="cad-tag">BROWSER SUPPORT</span>
+              <h3 class="sub-section-title">What Works Where</h3>
+            </div>
+            <div class="cad-coord-label">WEB SPEECH API / NO KEYS / NO PACKAGES / HTTPS OR LOCALHOST</div>
+          </div>
+
+          <div class="process-rows-wrap">
+            <div class="process-row">
+              <div class="pr-col pr-id">INPUT</div>
+              <div class="pr-col pr-name">Ask By Voice</div>
+              <div class="pr-col pr-desc">Recognition runs inside the browser. Firefox doesn't implement it, so there the microphone button disables itself and tells you why rather than failing quietly. Typing works everywhere.</div>
+              <div class="pr-col pr-kpi">Chrome / Edge / Safari</div>
+            </div>
+
+            <div class="process-row">
+              <div class="pr-col pr-id">OUTPUT</div>
+              <div class="pr-col pr-name">Spoken Replies</div>
+              <div class="pr-col pr-desc">Speech synthesis is the one piece every current browser ships, Firefox included. Where recognition is missing you can still type the question and have the answer read back.</div>
+              <div class="pr-col pr-kpi">All modern browsers</div>
+            </div>
+
+            <div class="process-row">
+              <div class="pr-col pr-id">WAKE</div>
+              <div class="pr-col pr-name">"Hey Optimizer"</div>
+              <div class="pr-col pr-desc">Holds the microphone open the whole time it's on, which is worth knowing before leaving it running on a shared terminal. Needs a secure context, so it works on HTTPS and localhost and does nothing at all on plain HTTP.</div>
+              <div class="pr-col pr-kpi">Chrome / Edge / Safari</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
   </main>
 
   <!-- FOOTER -->
@@ -308,6 +389,7 @@ We don't capture carbon. We stop you making it. Every litre of ethanol has a low
           <a href="#hero">Overview</a>
           <a href="#about">Process Architecture</a>
           <a href="#advisory">AI Advisory</a>
+          <a href="#voice">Voice Interface</a>
           <a href="login.html">Plant Operator Login</a>
         </div>
 

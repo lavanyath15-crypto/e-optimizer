@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BarChart3, TrendingUp, Calendar, Download, RefreshCw, Sparkles } from 'lucide-react';
+import { IllustrativeDataBanner } from './IllustrativeDataBanner';
 
 export const AnalyticsView: React.FC = () => {
   const [metricChoice, setMetricChoice] = useState<'yield' | 'steam' | 'ci'>('yield');
@@ -49,6 +50,13 @@ export const AnalyticsView: React.FC = () => {
         </div>
       </div>
 
+      <IllustrativeDataBanner>
+        The bars below are a fixed sample series, not your historian. The three metric
+        buttons above change the label, not the data, and there is no historian
+        connected yet. The project's real accuracy figures are the held-out R2 values
+        of 0.69, 0.38 and 0.18 shown on the AI Optimization screen.
+      </IllustrativeDataBanner>
+
       {/* Main Chart Card */}
       <div className="bg-white rounded-xl p-6 border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] space-y-6">
         <div className="flex items-center justify-between">
@@ -57,11 +65,12 @@ export const AnalyticsView: React.FC = () => {
               30-Day Moving Average vs AI Optimization Horizon
             </h3>
             <p className="text-xs text-[#767680] mt-0.5">
-              Correlation factor: R² = 0.942 (Significant statistical confidence)
+              Shape is illustrative. For the model's measured accuracy, see the R2 printed
+              on each prediction in AI Optimization.
             </p>
           </div>
-          <span className="text-xs font-bold text-[#2D6A4F] bg-[#2D6A4F]/10 px-2.5 py-1 rounded-full">
-            +3.8% Net Productivity
+          <span className="text-xs font-bold text-[#45464f] bg-[#eceef1] px-2.5 py-1 rounded-full">
+            Sample trend
           </span>
         </div>
 

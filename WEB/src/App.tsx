@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { TabType, ReportItem } from './types';
 import { INITIAL_REPORTS } from './data/mockData';
+import { useWakeWord } from './hooks/useVoice';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { ReportsView } from './components/ReportsView';
@@ -32,6 +33,34 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Voice
+  // Off by default: on meant every dashboard load asked for the microphone
+  // before anyone had said they wanted voice. The toggle is in the assistant.
+  const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
+  const [voiceAutoStart, setVoiceAutoStart] = useState(false);
+
+  const handleWakeWord = useCallback(() => {
+    setAiAssistantPrompt('');
+    setVoiceAutoStart(true);
+    setIsAiAssistantOpen(true);
+  }, []);
+
+  // Paused while the drawer is open, because the assistant's own recogniser
+  // takes the microphone from there.
+  const wakeWord = useWakeWord({
+    enabled: wakeWordEnabled && !isAiAssistantOpen,
+    onDetected: handleWakeWord
+  });
+
+  // Switching it back on is the retry: a refused microphone stays refused until
+  // the operator asks again, so granting permission and flicking this recovers
+  // without reloading the page.
+  const handleToggleWakeWord = () => {
+    const next = !wakeWordEnabled;
+    setWakeWordEnabled(next);
+    if (next) wakeWord.retry();
+  };
+
   // Periodic check to turn any 'generating' report into 'ready'
   const handleGenerateReport = (newReport: ReportItem) => {
     setReports((prev) => [newReport, ...prev]);
@@ -61,8 +90,8 @@ export default function App() {
           ? {
               ...r,
               status: 'ready',
-              statusText: 'Generated just now (Sensor 4 Imputed)',
-              generatedAt: 'Synthesized with 99.3% Correlation'
+              statusText: 'Generated just now (sample report)',
+              generatedAt: 'Illustrative data, nothing was imputed'
             }
           : r
       )
@@ -210,6 +239,12 @@ export default function App() {
           const found = reports.find((r) => r.id === repId);
           if (found) setSelectedReportForDetail(found);
         }}
+        autoStartListening={voiceAutoStart}
+        onAutoStartConsumed={() => setVoiceAutoStart(false)}
+        wakeWordEnabled={wakeWordEnabled}
+        onToggleWakeWord={handleToggleWakeWord}
+        wakeWordSupported={wakeWord.isSupported}
+        wakeWordError={wakeWord.error}
       />
 
       {/* Notifications Popover */}

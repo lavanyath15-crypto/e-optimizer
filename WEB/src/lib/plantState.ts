@@ -14,9 +14,6 @@ import {
   DistillationScenarioResult,
 } from './distillationEngine';
 
-/** Nominal daily throughput used when nothing else is specified. */
-export const DEFAULT_GRAIN_INPUT_TPD = 147.4;
-
 export function toScenarioPayload(
   scenarios: DistillationScenarioResult[]
 ): DistillationScenarioPayload[] {
@@ -39,8 +36,13 @@ export function buildPlantState(
   const consumption = predictConsumption(model, grainInputTpd);
   const emissions = computeEmissions(consumption, grainInputTpd);
 
+  // Screened at the same throughput as the predictions above, so the figures the
+  // LLM receives are all on one basis.
   const scenarios =
-    options?.scenarios ?? classifyScenarios(DISTILLATION_SCENARIOS.map(evaluateScenario));
+    options?.scenarios ??
+    classifyScenarios(
+      DISTILLATION_SCENARIOS.map((scenario) => evaluateScenario(scenario, grainInputTpd))
+    );
   const currentReflux =
     options?.refluxRatio ??
     scenarios.find((s) => s.id === CURRENT_OPERATION_SCENARIO_ID)?.refluxRatio;

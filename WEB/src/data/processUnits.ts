@@ -68,7 +68,10 @@ export const PROCESS_UNITS: ProcessUnit[] = [
     equipment: 'Beer Column C-101',
     fields: [
       { key: 'steamPressure', label: 'Steam Header Pressure', unit: 'PSI', min: 0, max: 300, step: 0.1, normalMin: 140, normalMax: 160, decimals: 1 },
-      { key: 'refluxRatio', label: 'Reflux Ratio', unit: '', min: 0.5, max: 5, step: 0.01, normalMin: 1.5, normalMax: 2.2, decimals: 2 },
+      // Band and default track DISTILLATION_SCENARIOS in lib/distillationEngine.ts,
+      // which anchors this column at reflux 2.3 to 3.1. Change them together or the
+      // two screens will disagree about what the plant is running.
+      { key: 'refluxRatio', label: 'Reflux Ratio', unit: '', min: 0.5, max: 5, step: 0.01, normalMin: 2.3, normalMax: 3.1, decimals: 2 },
       { key: 'feedRate', label: 'Beer Feed Rate', unit: 'GPM', min: 0, max: 3000, step: 10, normalMin: 1300, normalMax: 1550, decimals: 0 },
     ],
   },
@@ -91,7 +94,8 @@ export const PROCESS_DEFAULTS: ProcessValues = {
   milling: { feedRate: 3420, moisture: 14.2, screenSize: 3.2 },
   liquefaction: { cookTemp: 225.4, ph: 5.65, enzymeDose: 12.5 },
   fermentation: { abv: 14.82, temp: 89.2, durationH: 54 },
-  distillation: { steamPressure: 148.5, refluxRatio: 1.72, feedRate: 1420 },
+  // refluxRatio matches scenario S4, the current operating point in distillationEngine.
+  distillation: { steamPressure: 148.5, refluxRatio: 3.1, feedRate: 1420 },
   drying: { throughput: 38.2, outletMoisture: 9.8, inletTemp: 410 },
 };
 

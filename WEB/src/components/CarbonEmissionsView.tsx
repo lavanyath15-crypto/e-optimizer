@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Leaf, Award, TrendingDown, ArrowDownRight, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { IllustrativeDataBanner } from './IllustrativeDataBanner';
 
 export const CarbonEmissionsView: React.FC = () => {
   const [co2CaptureRate, setCo2CaptureRate] = useState<number>(96.8);
@@ -26,18 +27,28 @@ export const CarbonEmissionsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#2D6A4F]/10 border border-[#2D6A4F]/20 rounded-lg text-xs font-bold text-[#2D6A4F]">
+        <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#eceef1] border border-[#c6c5d1] rounded-lg text-xs font-bold text-[#45464f]">
           <ShieldCheck className="w-4 h-4" />
-          <span>GREET 2026 Model Validated</span>
+          <span>Not validated against any protocol</span>
         </div>
       </div>
+
+      <IllustrativeDataBanner>
+        Every figure on this screen is a fixed demonstration value, including the CI
+        score, the Scope 1 and 2 tonnages and the biogenic capture credit. The CI
+        number moves with the sliders below through a made-up sensitivity, not a
+        certified lifecycle model. Nothing here has been run through GREET, LCFS,
+        RFS2 or RED II, and none of it is usable for carbon credits or compliance
+        reporting. The figures that <em>are</em> modelled live on the AI Optimization
+        screen.
+      </IllustrativeDataBanner>
 
       {/* CI Score Hero Block */}
       <div className="bg-gradient-to-r from-[#001d23] via-[#00333d] to-[#061449] rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#abedff]">
             <Award className="w-4 h-4" />
-            <span>Certified Carbon Intensity (CI)</span>
+            <span>Illustrative Carbon Intensity (CI)</span>
           </div>
           <div className="flex items-baseline gap-3 mt-2">
             <span className="text-5xl font-extrabold font-mono text-white">
@@ -48,7 +59,9 @@ export const CarbonEmissionsView: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-[#dde1ff] mt-2 max-w-md">
-            Outperforming Midwest standard baseline (78.0 gCO2e/MJ) by <strong>{(78.0 - parseFloat(currentCi)).toFixed(1)} pts</strong>, eligible for tier-1 premium carbon credits.
+            Sitting <strong>{(78.0 - parseFloat(currentCi)).toFixed(1)} pts</strong> below the 78.0 gCO2e/MJ
+            figure used here as a Midwest reference. Both numbers are illustrative, so this gap does not
+            establish eligibility for any credit programme.
           </p>
         </div>
 

@@ -1,8 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Send, X, Sparkles, Copy, Check, ChevronRight, Zap, AlertTriangle } from 'lucide-react';
+import {
+  Bot,
+  Send,
+  X,
+  Sparkles,
+  Copy,
+  Check,
+  ChevronRight,
+  Zap,
+  AlertTriangle,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Moon
+} from 'lucide-react';
 import { ReportItem } from '../types';
 import { loadAnnModel, AnnModel } from '../lib/annModel';
-import { buildPlantState, DEFAULT_GRAIN_INPUT_TPD } from '../lib/plantState';
+import { buildPlantState } from '../lib/plantState';
+import { useVoice } from '../hooks/useVoice';
+import { usePlantInput } from '../hooks/usePlantInput';
 import { askAssistant } from '@backend/recommend.js';
 import type { ChatTurn } from '@backend/recommend.js';
 
@@ -21,6 +38,13 @@ interface AiAssistantModalProps {
   initialPrompt?: string;
   reports: ReportItem[];
   onOpenReport?: (reportId: string) => void;
+  /** Set when the wake word opened this, so the mic starts without a click. */
+  autoStartListening?: boolean;
+  onAutoStartConsumed?: () => void;
+  wakeWordEnabled?: boolean;
+  onToggleWakeWord?: () => void;
+  wakeWordSupported?: boolean;
+  wakeWordError?: string | null;
 }
 
 export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
@@ -28,7 +52,13 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   onClose,
   initialPrompt,
   reports,
-  onOpenReport
+  onOpenReport,
+  autoStartListening = false,
+  onAutoStartConsumed,
+  wakeWordEnabled = false,
+  onToggleWakeWord,
+  wakeWordSupported = false,
+  wakeWordError = null
 }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -44,6 +74,15 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   const [model, setModel] = useState<AnnModel | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // The throughput the operator actually set, not a nominal constant.
+  const { grainInputTpd } = usePlantInput();
+
+  // handleUserSend is declared below and closes over current state, so the voice
+  // callback reaches it through a ref rather than forcing a reorder.
+  const sendRef = useRef<(text?: string) => void>(() => {});
+  const voice = useVoice({
+    onFinalTranscript: (text) => sendRef.current(text)
+  });
 
   const samplePrompts = [
     'Why is S2 recommended over S1?',
@@ -65,6 +104,28 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  // Keep the voice callback pointed at the current closure.
+  useEffect(() => {
+    sendRef.current = handleUserSend;
+  });
+
+  // Opened by the wake word: pick the microphone straight up so the operator can
+  // keep talking without reaching for the mouse.
+  useEffect(() => {
+    if (isOpen && autoStartListening) {
+      voice.startListening();
+      onAutoStartConsumed?.();
+    }
+  }, [isOpen, autoStartListening]);
+
+  // Closing the drawer releases the microphone and cuts off any reply mid-word.
+  useEffect(() => {
+    if (!isOpen) {
+      voice.stopListening();
+      voice.stopSpeaking();
+    }
+  }, [isOpen]);
 
   const handleUserSend = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
@@ -88,7 +149,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setIsTyping(true);
 
     const reply = model
-      ? await askAssistant(text, buildPlantState(model, DEFAULT_GRAIN_INPUT_TPD), history)
+      ? await askAssistant(text, buildPlantState(model, grainInputTpd), history)
       : {
           recommendations: null,
           provider: null,
@@ -107,6 +168,10 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
       }
     ]);
     setIsTyping(false);
+
+    // Read the answer out, but not the failures: a spoken stack of provider
+    // errors is noise, and it is already on screen in red.
+    if (reply.recommendations) voice.speak(reply.recommendations);
   };
 
   const handleCopy = (text: string, id: string) => {
@@ -158,7 +223,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           <div className="px-5 py-2.5 bg-[#f2f4f7] border-b border-[#e0e3e6] flex items-center justify-between text-xs text-[#45464f]">
             <div className="flex items-center gap-1.5 font-mono">
               <Zap className="w-3.5 h-3.5 text-[#0f6e8c]" />
-              <span>Throughput: <strong>{DEFAULT_GRAIN_INPUT_TPD} t/day</strong></span>
+              <span>Throughput: <strong>{grainInputTpd} t/day</strong></span>
             </div>
             <div className="flex items-center gap-1.5 font-mono">
               <span>Model: <strong>{model ? 'loaded' : 'loading'}</strong></span>
@@ -166,7 +231,53 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             <div className="flex items-center gap-1.5 font-mono">
               <span>LLM: <strong>{provider ?? 'idle'}</strong></span>
             </div>
+
+            {/* Voice state, and the only switch for the always-on wake word. */}
+            <div className="flex items-center gap-2">
+              {voice.isListening ? (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#BA1A1A]/10 text-[#BA1A1A] font-bold">
+                  <Mic className="w-3.5 h-3.5 animate-pulse" />
+                  <span>Listening</span>
+                </span>
+              ) : voice.isSpeaking ? (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#0f6e8c]/10 text-[#0f6e8c] font-bold">
+                  <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+                  <span>Speaking</span>
+                </span>
+              ) : null}
+
+              {wakeWordSupported && onToggleWakeWord && (
+                <button
+                  type="button"
+                  onClick={onToggleWakeWord}
+                  title={
+                    wakeWordEnabled
+                      ? 'Wake word on. The microphone stays open in the background.'
+                      : 'Wake word off. Click the mic to talk instead.'
+                  }
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full font-bold transition-colors cursor-pointer ${
+                    wakeWordEnabled
+                      ? 'bg-[#2D6A4F]/10 text-[#2D6A4F]'
+                      : 'bg-[#eceef1] text-[#767680]'
+                  }`}
+                >
+                  <Moon className="w-3.5 h-3.5" />
+                  <span>{wakeWordEnabled ? 'Wake word on' : 'Wake word off'}</span>
+                </button>
+              )}
+            </div>
           </div>
+
+          {(voice.error || wakeWordError || (!voice.isRecognitionSupported && isOpen)) && (
+            <div className="px-5 py-2 bg-[#FFB703]/10 border-b border-[#FFB703]/30 text-[11px] text-[#8a6100] flex items-start gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>
+                {voice.error ??
+                  wakeWordError ??
+                  'Voice input is not supported in this browser. Firefox has no speech recognition, so type your question instead. Replies can still be read aloud.'}
+              </span>
+            </div>
+          )}
 
           {/* Messages Feed */}
           <div className="flex-1 p-5 overflow-y-auto space-y-4 custom-scrollbar bg-[#f7f9fc]">
@@ -271,14 +382,63 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
             >
               <input
                 type="text"
-                value={inputText}
+                value={voice.isListening ? voice.transcript : inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Ask about steam, CO2e, the scenarios, anything on screen..."
-                className="flex-1 px-4 py-2.5 bg-[#f7f9fc] border border-[#c6c5d1] rounded-xl text-xs text-[#061449] focus:outline-none focus:border-[#0f6e8c] focus:ring-2 focus:ring-[#0f6e8c]/20"
+                readOnly={voice.isListening}
+                placeholder={
+                  voice.isListening
+                    ? 'Listening...'
+                    : 'Ask about steam, CO2e, the scenarios, anything on screen...'
+                }
+                className={`flex-1 px-4 py-2.5 rounded-xl text-xs text-[#061449] focus:outline-none focus:ring-2 transition-colors ${
+                  voice.isListening
+                    ? 'bg-[#BA1A1A]/5 border border-[#BA1A1A]/40 focus:ring-[#BA1A1A]/20'
+                    : 'bg-[#f7f9fc] border border-[#c6c5d1] focus:border-[#0f6e8c] focus:ring-[#0f6e8c]/20'
+                }`}
               />
+
+              {/* Stop the reply mid-sentence. Only useful while it is talking. */}
+              {voice.isSpeaking && (
+                <button
+                  type="button"
+                  onClick={voice.stopSpeaking}
+                  title="Stop speaking"
+                  aria-label="Stop speaking"
+                  className="p-2.5 bg-[#eceef1] hover:bg-[#c6c5d1] text-[#45464f] rounded-xl transition-colors cursor-pointer"
+                >
+                  <VolumeX className="w-4 h-4" />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={voice.isListening ? voice.stopListening : voice.startListening}
+                disabled={!voice.isRecognitionSupported || isTyping}
+                title={
+                  voice.isRecognitionSupported
+                    ? voice.isListening
+                      ? 'Stop listening'
+                      : 'Ask by voice'
+                    : 'Voice input is not supported in this browser'
+                }
+                aria-label={voice.isListening ? 'Stop listening' : 'Ask by voice'}
+                aria-pressed={voice.isListening}
+                className={`p-2.5 rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                  voice.isListening
+                    ? 'bg-[#BA1A1A] hover:bg-[#93000a] text-white animate-pulse'
+                    : 'bg-[#eceef1] hover:bg-[#c6c5d1] text-[#45464f]'
+                }`}
+              >
+                {voice.isRecognitionSupported ? (
+                  <Mic className="w-4 h-4" />
+                ) : (
+                  <MicOff className="w-4 h-4" />
+                )}
+              </button>
+
               <button
                 type="submit"
-                disabled={!inputText.trim() || isTyping}
+                disabled={!inputText.trim() || isTyping || voice.isListening}
                 className="p-2.5 bg-[#0f6e8c] hover:bg-[#0b5670] disabled:opacity-50 text-white rounded-xl shadow-md transition-all cursor-pointer"
               >
                 <Send className="w-4 h-4" />

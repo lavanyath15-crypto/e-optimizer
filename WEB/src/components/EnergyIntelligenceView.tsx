@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Zap, Flame, BatteryCharging, TrendingDown, ArrowUpRight, DollarSign } from 'lucide-react';
+import { IllustrativeDataBanner } from './IllustrativeDataBanner';
 
 export const EnergyIntelligenceView: React.FC = () => {
   const [selectedRange, setSelectedRange] = useState<'24h' | '7d' | '30d'>('24h');
@@ -35,6 +36,14 @@ export const EnergyIntelligenceView: React.FC = () => {
           ))}
         </div>
       </div>
+
+      <IllustrativeDataBanner>
+        The three totals below, the utility costs and the hourly load profile are fixed
+        demonstration values, not meter readings. The 24h / 7d / 30d buttons change the
+        selection but not the data, because no historian or sub-metering is connected
+        yet. Modelled electricity, steam and dryer fuel are on the AI Optimization
+        screen.
+      </IllustrativeDataBanner>
 
       {/* Energy Metrics 3-Card Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

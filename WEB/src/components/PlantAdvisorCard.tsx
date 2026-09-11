@@ -12,11 +12,13 @@ import {
 import { getRecommendations } from '@backend/recommend.js';
 import type { DistillationScenarioPayload } from '@backend/recommend.js';
 import { DistillationScenarioResult } from '../lib/distillationEngine';
-
-// Range covered by the training data. Outside it the network extrapolates.
-const TRAINED_MIN_TPD = 124.5;
-const TRAINED_MAX_TPD = 165.0;
-const DEFAULT_TPD = 147.4;
+import {
+  usePlantInput,
+  TRAINED_MIN_TPD,
+  TRAINED_MAX_TPD,
+  GRAIN_INPUT_MIN_TPD,
+  GRAIN_INPUT_MAX_TPD,
+} from '../hooks/usePlantInput';
 
 interface PlantAdvisorCardProps {
   scenarios: DistillationScenarioResult[];
@@ -29,7 +31,9 @@ export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
 }) => {
   const [model, setModel] = useState<AnnModel | null>(null);
   const [modelError, setModelError] = useState<string | null>(null);
-  const [grainInput, setGrainInput] = useState<number>(DEFAULT_TPD);
+  // Shared with the scenario table and the assistant, so all three describe the
+  // same plant.
+  const { grainInputTpd: grainInput, setGrainInputTpd, isExtrapolating } = usePlantInput();
   const [draft, setDraft] = useState<string | null>(null);
 
   const [advice, setAdvice] = useState<string | null>(null);
@@ -52,13 +56,13 @@ export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
     ? computeEmissions(consumption, grainInput)
     : null;
 
-  const extrapolating = grainInput < TRAINED_MIN_TPD || grainInput > TRAINED_MAX_TPD;
+  const extrapolating = isExtrapolating;
 
   const commitGrainInput = (raw: string) => {
     const parsed = parseFloat(raw);
     // Clearing the box keeps the last reading rather than jumping to zero.
     if (!Number.isNaN(parsed)) {
-      setGrainInput(Math.min(400, Math.max(1, parsed)));
+      setGrainInputTpd(parsed);
     }
     setDraft(null);
   };
@@ -128,8 +132,8 @@ export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
               id="advisor-grain"
               type="number"
               inputMode="decimal"
-              min={1}
-              max={400}
+              min={GRAIN_INPUT_MIN_TPD}
+              max={GRAIN_INPUT_MAX_TPD}
               step={0.1}
               value={draft ?? String(grainInput)}
               onChange={(e) => setDraft(e.target.value)}
@@ -303,7 +307,9 @@ export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
         {DRYER_FUEL_KG_CO2E_PER_MMBTU} kg CO2e/MMBtu) weren't guessed. We pulled them back out
         of the source data, and they reproduce its own CO2e column to within 0.006%. Worth
         knowing: that data is synthetic, and its README says don't use it for regulatory
-        reporting or carbon credits.
+        reporting or carbon credits. The scenario table above uses a generic natural gas factor
+        instead, which prices the same steam about 2x higher, so its CO2e figures and these ones
+        are not on the same basis.
       </p>
     </div>
   );

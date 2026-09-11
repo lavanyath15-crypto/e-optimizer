@@ -304,18 +304,13 @@ export const PLANT_ALARMS: PlantAlarm[] = [
   }
 ];
 
+// Illustrative setpoints for levers the app does not model. Reflux is
+// deliberately NOT in this list: lib/distillationEngine.ts is the single source
+// of truth for it, and the scenario table on the same screen derives the reflux
+// recommendation there. A mock reflux card used to sit here suggesting 1.85 ->
+// 1.72 while the engine below said 3.1 -> 2.5, which put two contradictory
+// answers on one screen. Keep reflux out of here.
 export const AI_SETPOINTS: AiOptimizationSetpoint[] = [
-  {
-    id: 'sp-1',
-    parameter: 'Distillation Beer Column Reflux Ratio',
-    unit: 'ratio',
-    currentValue: 1.85,
-    recommendedValue: 1.72,
-    expectedGain: '-3.2% steam consumption ($1,450/day savings)',
-    confidence: 96.4,
-    safetyMargin: '0.05% margin to bottoms ethanol slip',
-    status: 'pending'
-  },
   {
     id: 'sp-2',
     parameter: 'Glucoamylase Dosing Pump Speed',

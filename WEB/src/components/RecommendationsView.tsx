@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, DollarSign, ArrowRight, CheckCircle2, ChevronRight } from 'lucide-react';
+import { IllustrativeDataBanner } from './IllustrativeDataBanner';
 
 export const RecommendationsView: React.FC = () => {
   const [appliedList, setAppliedList] = useState<string[]>([]);
@@ -53,6 +54,14 @@ export const RecommendationsView: React.FC = () => {
           </p>
         </div>
       </div>
+
+      <IllustrativeDataBanner>
+        These three cards are worked examples, not findings from your plant. The savings,
+        payback periods and fouling factors are invented to show the format, and
+        "Adopt Recommendation" only marks the card locally. The recommendations that are
+        actually generated from your figures, by the model and the LLM, are on the AI
+        Optimization screen.
+      </IllustrativeDataBanner>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {recs.map((rec) => {

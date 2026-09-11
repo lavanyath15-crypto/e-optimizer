@@ -175,8 +175,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <span className="font-mono font-bold text-[#061449]">14.8 PSI</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Reflux Ratio (AI Tuned):</span>
-                  <span className="font-mono font-bold text-[#061449]">1.72</span>
+                  <span>Reflux Ratio (current, S4):</span>
+                  <span className="font-mono font-bold text-[#061449]">3.1</span>
                 </div>
               </div>
               <div className="w-full bg-[#e0e3e6] h-1.5 rounded-full overflow-hidden">

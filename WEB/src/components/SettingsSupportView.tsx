@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, HelpCircle, Shield, Sliders, Database, Server, CheckCircle2, LogOut } from 'lucide-react';
 import { signOut } from '@backend/auth.js';
+import { IllustrativeDataBanner } from './IllustrativeDataBanner';
 
 const SLIDING_PAGE_URL = '/';
 
@@ -49,9 +50,12 @@ export const SettingsSupportView: React.FC<SettingsSupportViewProps> = ({
       </div>
 
       {saveSuccess && (
-        <div className="p-3.5 bg-[#2D6A4F]/10 border border-[#2D6A4F]/30 rounded-xl text-xs font-bold text-[#2D6A4F] flex items-center gap-2">
+        <div className="p-3.5 bg-[#FFB703]/10 border border-[#FFB703]/40 rounded-xl text-xs font-bold text-[#8a6100] flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
-          <span>Saved. Your changes are live.</span>
+          <span>
+            Not saved. This form has no backend yet, so nothing was written and these
+            values reset on reload.
+          </span>
         </div>
       )}
 
@@ -62,6 +66,12 @@ export const SettingsSupportView: React.FC<SettingsSupportViewProps> = ({
               <Server className="w-4 h-4 text-[#0f6e8c]" />
               <span>Plant & DCS Gateway Configuration</span>
             </h3>
+
+            <IllustrativeDataBanner>
+              These fields are not wired to anything. There is no DCS gateway, no
+              historian sync and no carbon accounting integration behind them, and
+              saving does not persist. Signing out below is real.
+            </IllustrativeDataBanner>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -147,6 +157,11 @@ export const SettingsSupportView: React.FC<SettingsSupportViewProps> = ({
         </form>
       ) : (
         <div className="bg-white rounded-xl p-6 border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] space-y-4">
+          <IllustrativeDataBanner>
+            The contacts below are placeholders. The name, extension, phone number and
+            address are not real and there is no escalation desk behind them.
+          </IllustrativeDataBanner>
+
           <h3 className="text-base font-bold text-[#061449]">
             Industrial Engineering Technical Support
           </h3>

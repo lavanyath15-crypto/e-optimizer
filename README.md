@@ -29,9 +29,20 @@ Most dashboards blur this line. Here it is straight, so you know what you're loo
 | Distillation screening | **Real.** Purity and recovery constraints applied per scenario |
 | LLM recommendations and chat | **Real.** Live call to an open-weight model, refuses to answer what it can't see |
 | Login and sessions | **Real.** Supabase auth, RLS enabled |
+| Voice in and out | **Real.** Browser Web Speech API, no packages or keys. Chrome, Edge and Safari only |
 | Process stage readings | **Yours to enter.** Defaults are typical dry-mill values, saved to your browser |
 | Reports, alarms, sensor streams | **Mock.** Nothing is wired to a historian yet |
+| Carbon & CO2e Ledger screen | **Illustrative.** CI score, Scope 1/2 tonnages and the capture credit are fixed demo values. Not run through GREET, LCFS, RFS2 or RED II |
+| Energy Intelligence screen | **Illustrative.** Totals, costs and the load profile are fixed. The 24h/7d/30d buttons don't change the data |
+| Plant Analytics screen | **Illustrative.** Sample trend series. The metric buttons change the label only |
+| Plant Recommendations screen | **Illustrative.** Worked examples. The savings and payback figures are invented |
+| AI Optimization setpoints | **Illustrative**, except the distillation scenario table and advisory card below them, which are real |
+| Plant Settings | **Not persisted.** The form reports success but saves nothing |
 | The dataset itself | **Synthetic.** Its own README says it's not for regulatory reporting |
+
+Each of those screens says the same thing in a banner at the top, so you don't have
+to come back here to remember which is which. Everything marked illustrative is
+there to show the layout; nothing on those screens is computed from your inputs.
 
 ---
 
@@ -63,6 +74,17 @@ dryer fuel      53.0  kg CO2e / MMBtu
 
 Feed those back through and they reproduce the dataset's own `Operational_CO2e_t`
 column to within **0.006%**. You can check that yourself in one command, further down.
+
+One thing to know before comparing numbers across screens: the distillation scenario
+screening does **not** use that 0.06 figure. It converts reboiler duty at 56.1 kg
+CO2e/GJ, the generic natural gas combustion factor, which comes out around 0.12 kg
+CO2e per kg of steam. The two differ by about 2x, because the synthetic dataset was
+evidently built with a steam factor roughly half what natural-gas-raised steam
+normally costs. Both are kept on purpose: 0.06 is what makes the emissions figures
+reproduce the dataset, 56.1 is what keeps the scenario comparison physically
+realistic. They are not on the same basis, so don't sum or compare CO2e across the
+two cards. Both say so on screen. Swap in your plant's measured boiler factor and the
+split disappears.
 
 ---
 
@@ -127,7 +149,7 @@ Four layers, each doing one job:
   [3] Scenario screening      purity >= 99.5%, recovery >= 95%
          |                    lowest-steam point that clears both
          v
-  [4] LLM advisory            open-weight model via Groq, Mistral as backup
+  [4] LLM advisory            open-weight model via Mistral, Groq as backup
          |                    given only the numbers above, told not to invent
          v
   One recommendation, with its reasoning
@@ -148,6 +170,36 @@ That refusal is the point. An advisor that makes up a plausible bearing-fault
 diagnosis is worse than no advisor at all.
 
 ---
+
+## Talking to it
+
+The assistant takes voice as well as typing, through the browser's own Web Speech
+API. Nothing is installed and nothing is sent anywhere we control: recognition and
+the voice are whatever your browser ships.
+
+| | How |
+|---|---|
+| Ask by voice | Mic button next to Send. Your words appear live in the box, and the question sends itself when you stop talking |
+| Replies read aloud | Spoken automatically. The speaker button stops it mid-sentence |
+| Hands free | Say **"Hey Optimizer"** and the assistant opens with the mic already live |
+
+Units are expanded before they are spoken, so `412.8 kg CO2e/kL` is read as
+"412.8 kilograms of C O 2 equivalent per kilolitre" rather than spelled out
+character by character. Failed replies are shown but not read out.
+
+**The wake word holds the microphone open** for as long as it is on, so it ships
+**off**. Turn it on from the toggle in the assistant's header strip, next to the
+status. If the browser refuses the microphone, flick the same toggle off and on to
+retry once you have granted permission. Recognition also needs a secure context, so
+it works on localhost and HTTPS and silently does nothing on plain HTTP.
+
+| Browser | Ask by voice | Replies read aloud | Wake word |
+|---|---|---|---|
+| Chrome, Edge, Safari | yes | yes | yes |
+| Firefox | no | yes | no |
+
+Firefox has no speech recognition. The mic button disables itself and says so
+rather than breaking, and replies are still spoken.
 
 ## Layout
 
@@ -176,8 +228,19 @@ on its own and the build fails on an unresolved import.
 
 ## Verify it yourself
 
-Nothing here is hardcoded to pass. Run this and it re-checks the dataset, the model
-and the formulas from scratch, and reports anything that's drifted:
+Two layers. The TypeScript that actually runs in your browser:
+
+```bash
+cd WEB && npm test
+```
+
+31 tests over the three modules that do the work: the emission formulas, the
+distillation screening, and the network's forward pass. The model test loads the
+real `ann.json` and checks it reproduces the Python reference values to six decimal
+places, so if a retrain ever drifts from the browser code, that fails.
+
+Then the Python side, which re-checks the dataset, the model and the formulas from
+scratch and reports anything that's moved:
 
 ```bash
 python ml/verify.py
@@ -225,8 +288,8 @@ Nothing, and not in the "free until you're useful" sense:
 | Vite, React, Tailwind, lucide | Open source | none |
 | Netlify | Free for personal projects | build minutes if you push constantly |
 | Supabase | 500 MB, 50k monthly users | **pauses after 7 days idle.** Open the dashboard to wake it |
-| Groq (gpt-oss-120b) | ~1,000 requests/day | 30/min rate limit |
-| Mistral | Free tier | used only when Groq fails |
+| Mistral (mistral-small-latest) | Free tier | primary provider |
+| Groq (gpt-oss-120b) | ~1,000 requests/day | 30/min rate limit, used only when Mistral fails |
 
 The LLM is open-weight (Apache 2.0), so no proprietary API is in the critical path.
 If Groq disappeared tomorrow you could point it at any OpenAI-compatible endpoint,

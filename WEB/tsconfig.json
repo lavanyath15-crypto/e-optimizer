@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    // The project passes cleanly under strict, so it is on. Without it, and with
+    // @types/react missing, `npm run lint` used to report success while checking
+    // almost nothing in the React layer.
+    "strict": true,
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "module": "ESNext",

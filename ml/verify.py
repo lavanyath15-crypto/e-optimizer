@@ -101,6 +101,15 @@ def main() -> None:
     actual = np.column_stack([elec, steam, fuel])
     predicted = np.array([predict([g]) for g in grain])
 
+    # R2 below is over all 365 rows, including the 80% the network trained on.
+    # That is a different metric from the held-out test R2 quoted in the README
+    # and stored in ann.json["testR2"], which is scored on the 20% split only.
+    # Expect the two to differ by a few points; they are not in conflict.
+    print("  R2 over all 365 rows (train + test). Held-out test R2, from training:")
+    for name, score in model["testR2"].items():
+        print(f"    {name:32s} {score:7.4f}")
+    print()
+
     print(f"  {'target':32s} {'R2':>7s} {'mean err':>11s} {'mean actual':>13s}")
     for i, name in enumerate(model["targets"]):
         a, p = actual[:, i], predicted[:, i]

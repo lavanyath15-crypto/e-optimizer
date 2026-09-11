@@ -32,6 +32,21 @@ export const PURITY_MIN_PCT = 99.5;
 export const RECOVERY_MIN_PCT = 95;
 export const LATENT_HEAT_KJ_PER_KG = 2200; // effective steam latent heat
 export const EMISSION_FACTOR_KG_CO2E_PER_GJ = 56.1; // standard natural gas combustion factor (IPCC/EPA default)
+
+// Deliberate difference, not a bug. This module prices steam through reboiler
+// duty at the generic natural gas factor above: 2200 kJ/kg x 56.1 kg CO2e/GJ
+// works out to ~0.123 kg CO2e per kg of steam. emissionsFormula.ts instead uses
+// DISTILLATION_STEAM_KG_CO2E_PER_KG = 0.06, recovered from the source dataset by
+// least squares.
+//
+// They disagree by ~2x because the synthetic dataset was evidently generated
+// with a steam factor about half what natural-gas-raised steam normally costs.
+// Each is kept for a reason: 0.06 keeps emissionsFormula reproducing the
+// dataset's own CO2e column to 0.006%, and 56.1 keeps the scenario comparison
+// physically realistic. Because of that, CO2e figures from this module are not
+// on the same basis as those from emissionsFormula and must not be summed or
+// compared. Both cards say so on screen. Replace both with your plant's
+// measured boiler factor and the discrepancy goes away.
 export const OPERATING_DAYS_PER_YEAR = 330;
 
 // Grain_Input_tpd -> Ethanol_Production_kL_day, basis 390 L ethanol per tonne grain.
@@ -39,14 +54,42 @@ export function grainToEthanolProduction(grainInputTpd: number): number {
   return (grainInputTpd * 390) / 1000;
 }
 
-const ETHANOL_PRODUCTION_KL_DAY = grainToEthanolProduction(147.4); // ~57.5 kL/day
+/**
+ * Throughput the scenario steam figures were recorded at. The anchor points in
+ * DISTILLATION_SCENARIOS are daily steam totals, so they only mean anything
+ * against the throughput they were measured at.
+ */
+export const SCENARIO_ANCHOR_TPD = 147.4;
 
-export function evaluateScenario(input: DistillationScenarioInput): DistillationScenarioResult {
-  const ethanolProductionKlDay = ETHANOL_PRODUCTION_KL_DAY;
-  const specificSteamKgPerKl = input.steamKgDay / ethanolProductionKlDay;
-  const reboilerDutyGjDay = (input.steamKgDay * LATENT_HEAT_KJ_PER_KG) / 1_000_000;
+/**
+ * Scales a scenario's daily steam from the anchor throughput to the one being
+ * run.
+ *
+ * Steam is taken as proportional to throughput, which is a first-order
+ * assumption: it holds the specific steam figure (kg/kL) constant across
+ * throughputs and lets the daily totals and CO2e move. That is the behaviour you
+ * want from a screening table, because the choice between scenarios is a
+ * question about reflux, not about how much grain is going in. A real column
+ * has a fixed reboiler overhead that makes this slightly optimistic at low
+ * rates.
+ */
+function scaleSteamToThroughput(steamKgDay: number, grainInputTpd: number): number {
+  return steamKgDay * (grainInputTpd / SCENARIO_ANCHOR_TPD);
+}
+
+export function evaluateScenario(
+  input: DistillationScenarioInput,
+  grainInputTpd: number = SCENARIO_ANCHOR_TPD
+): DistillationScenarioResult {
+  const ethanolProductionKlDay = grainToEthanolProduction(grainInputTpd);
+  const steamKgDay = scaleSteamToThroughput(input.steamKgDay, grainInputTpd);
+
+  const specificSteamKgPerKl =
+    ethanolProductionKlDay > 0 ? steamKgDay / ethanolProductionKlDay : 0;
+  const reboilerDutyGjDay = (steamKgDay * LATENT_HEAT_KJ_PER_KG) / 1_000_000;
   const co2eKgDay = reboilerDutyGjDay * EMISSION_FACTOR_KG_CO2E_PER_GJ;
-  const co2eIntensityKgPerKl = co2eKgDay / ethanolProductionKlDay;
+  const co2eIntensityKgPerKl =
+    ethanolProductionKlDay > 0 ? co2eKgDay / ethanolProductionKlDay : 0;
 
   const purityOk = input.purityPct >= PURITY_MIN_PCT;
   const recoveryOk = input.recoveryPct >= RECOVERY_MIN_PCT;
@@ -54,6 +97,9 @@ export function evaluateScenario(input: DistillationScenarioInput): Distillation
 
   return {
     ...input,
+    // Overrides the anchor figure from `input` with the throughput-scaled one,
+    // so every number on the row is on the same basis.
+    steamKgDay,
     ethanolProductionKlDay,
     specificSteamKgPerKl,
     reboilerDutyGjDay,

@@ -12,8 +12,10 @@ import {
   computeSavings,
 } from '../lib/distillationEngine';
 import { PlantAdvisorCard } from './PlantAdvisorCard';
+import { usePlantInput } from '../hooks/usePlantInput';
 
 export const AiOptimizationView: React.FC = () => {
+  const { grainInputTpd } = usePlantInput();
   const [setpoints, setSetpoints] = useState<AiOptimizationSetpoint[]>(AI_SETPOINTS);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -33,9 +35,14 @@ export const AiOptimizationView: React.FC = () => {
     setTimeout(() => setFeedback(null), 3000);
   };
 
+  // Recomputed whenever the operator changes throughput, so the table describes
+  // the plant they are actually running rather than a fixed nominal day.
   const distillationResults = useMemo(
-    () => classifyScenarios(DISTILLATION_SCENARIOS.map(evaluateScenario)),
-    []
+    () =>
+      classifyScenarios(
+        DISTILLATION_SCENARIOS.map((scenario) => evaluateScenario(scenario, grainInputTpd))
+      ),
+    [grainInputTpd]
   );
 
   const baseline = distillationResults.find((r) => r.id === CURRENT_OPERATION_SCENARIO_ID)!;
@@ -196,7 +203,11 @@ export const AiOptimizationView: React.FC = () => {
                     )}
                   </td>
                   <td className="py-2.5 pr-4 font-mono">{r.refluxRatio.toFixed(1)}</td>
-                  <td className="py-2.5 pr-4 font-mono">{r.steamKgDay.toLocaleString()}</td>
+                  {/* Scaling to throughput makes this fractional; kg/day to three
+                      decimal places is noise on a 70-tonne figure. */}
+                  <td className="py-2.5 pr-4 font-mono">
+                    {r.steamKgDay.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </td>
                   <td className="py-2.5 pr-4 font-mono">{r.specificSteamKgPerKl.toFixed(1)}</td>
                   <td className={`py-2.5 pr-4 font-mono ${!r.recoveryOk ? 'text-[#BA1A1A] font-bold' : ''}`}>
                     {r.recoveryPct.toFixed(1)}
@@ -258,8 +269,14 @@ export const AiOptimizationView: React.FC = () => {
         )}
 
         <p className="text-[10px] text-[#767680] pt-1 border-t border-[#e0e3e6]">
-          CO2e here assumes natural gas at 56.1 kg CO2e/GJ until you confirm your actual fuel. The purity and
-          recovery limits are study defaults too. Put your own numbers in before any of this goes in a report.
+          CO2e in this table converts reboiler duty at 56.1 kg CO2e/GJ, the generic natural gas
+          combustion factor, which works out to about 0.12 kg CO2e per kg of steam. The advisory card
+          below prices the same steam at 0.06 kg CO2e/kg, the factor recovered from the source dataset.
+          The two differ by roughly 2x, because the dataset's implied factor is about half what
+          natural-gas-raised steam normally costs. Each is right for what it does here, but they are not
+          interchangeable: don't compare the CO2e figures in this table against the ones below. The
+          purity and recovery limits are study defaults too. Put your own commissioned numbers in before
+          any of this goes in a report.
         </p>
       </div>
 
