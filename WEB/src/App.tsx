@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { TabType, ReportItem } from './types';
 import { INITIAL_REPORTS } from './data/mockData';
 import { useWakeWord } from './hooks/useVoice';
@@ -19,6 +19,17 @@ import { AiAssistantModal } from './components/AiAssistantModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { Bot } from 'lucide-react';
 
+const WAKE_WORD_KEY = 'eoptimizer-wake-word';
+
+/** Defaults to on; only an explicit "false" from a previous visit turns it off. */
+function readWakeWordPref(): boolean {
+  try {
+    return localStorage.getItem(WAKE_WORD_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
 export default function App() {
   const [currentTab, setCurrentTab] = useState<TabType>('reports');
   const [reports, setReports] = useState<ReportItem[]>(INITIAL_REPORTS);
@@ -34,9 +45,18 @@ export default function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Voice
-  // Off by default: on meant every dashboard load asked for the microphone
-  // before anyone had said they wanted voice. The toggle is in the assistant.
-  const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
+  // On by default so voice works without hunting for a switch first. The cost is
+  // that the dashboard asks for the microphone on load; the toggle in the
+  // assistant header turns it off and that choice is remembered.
+  const [wakeWordEnabled, setWakeWordEnabled] = useState<boolean>(readWakeWordPref);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WAKE_WORD_KEY, String(wakeWordEnabled));
+    } catch {
+      // Private mode: the setting just does not persist.
+    }
+  }, [wakeWordEnabled]);
   const [voiceAutoStart, setVoiceAutoStart] = useState(false);
 
   const handleWakeWord = useCallback(() => {
@@ -153,6 +173,10 @@ export default function App() {
         unreadAlertsCount={2}
         onQuickRefresh={handleQuickRefresh}
         isRefreshing={isRefreshing}
+        wakeWordSupported={wakeWord.isSupported}
+        wakeWordEnabled={wakeWordEnabled}
+        wakeWordActive={wakeWord.isActive}
+        onToggleWakeWord={handleToggleWakeWord}
       />
 
       {/* Main Content Area */}

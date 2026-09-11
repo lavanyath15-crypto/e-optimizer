@@ -1,7 +1,7 @@
 import React from 'react';
 import { ASSETS } from '../data/mockData';
 import { useOperator } from '../hooks/useOperator';
-import { Search, Bell, Settings, Menu, RefreshCw } from 'lucide-react';
+import { Search, Bell, Settings, Menu, RefreshCw, Mic, MicOff } from 'lucide-react';
 
 interface HeaderProps {
   searchQuery: string;
@@ -12,6 +12,11 @@ interface HeaderProps {
   unreadAlertsCount?: number;
   onQuickRefresh?: () => void;
   isRefreshing?: boolean;
+  wakeWordSupported?: boolean;
+  wakeWordEnabled?: boolean;
+  /** True only while the background recogniser actually holds the microphone. */
+  wakeWordActive?: boolean;
+  onToggleWakeWord?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,7 +27,11 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   unreadAlertsCount = 2,
   onQuickRefresh,
-  isRefreshing = false
+  isRefreshing = false,
+  wakeWordSupported = false,
+  wakeWordEnabled = false,
+  wakeWordActive = false,
+  onToggleWakeWord
 }) => {
   const operator = useOperator();
 
@@ -75,6 +84,43 @@ export const Header: React.FC<HeaderProps> = ({
             Plant Status: Active
           </span>
         </div>
+
+        {/* Wake word state. Lives here rather than only in the assistant,
+            because the assistant is shut whenever the wake word is listening,
+            so its own badge is invisible exactly when it matters. */}
+        {wakeWordSupported && onToggleWakeWord && (
+          <button
+            onClick={onToggleWakeWord}
+            aria-pressed={wakeWordEnabled}
+            title={
+              wakeWordEnabled
+                ? wakeWordActive
+                  ? 'Listening for "Hey Optimizer". Click to turn off.'
+                  : 'Wake word on, starting up. Click to turn off.'
+                : 'Wake word off. Click to listen for "Hey Optimizer".'
+            }
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold transition-colors cursor-pointer ${
+              wakeWordEnabled
+                ? 'bg-[#2D6A4F]/10 border-[#2D6A4F]/25 text-[#2D6A4F]'
+                : 'bg-[#eceef1] border-[#c6c5d1] text-[#767680]'
+            }`}
+          >
+            {wakeWordEnabled ? (
+              <span className="relative flex h-2 w-2">
+                {wakeWordActive && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2D6A4F] opacity-75"></span>
+                )}
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#2D6A4F]"></span>
+              </span>
+            ) : (
+              <MicOff className="w-3.5 h-3.5" />
+            )}
+            {wakeWordEnabled && <Mic className="w-3.5 h-3.5" />}
+            <span className="uppercase tracking-wider">
+              {wakeWordEnabled ? (wakeWordActive ? 'Listening' : 'Starting') : 'Voice off'}
+            </span>
+          </button>
+        )}
 
         {/* Quick Refresh Telemetry button */}
         {onQuickRefresh && (

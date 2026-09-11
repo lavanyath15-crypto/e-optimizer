@@ -406,15 +406,42 @@ export interface UseWakeWord {
   retry: () => void;
 }
 
-const DEFAULT_WAKE_PHRASES = ['hey optimizer', 'hey optimiser'];
+/**
+ * Spelling and truncation both vary in practice: the recogniser returns
+ * "optimiser" as often as "optimizer", and frequently cuts the word short
+ * because the speaker has already moved on. Matching the shared stem catches
+ * every form without being loose enough to fire on ordinary speech.
+ */
+const DEFAULT_WAKE_PHRASES = [
+  'hey optimi',
+  'hi optimi',
+  'hey optimizer',
+  'hey optimiser',
+];
 
 /** Lowercases and strips punctuation so "Hey, Optimizer!" still matches. */
-function normalise(text: string): string {
+export function normalise(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * True when the phrase appears anywhere in what was heard.
+ *
+ * `segments` is every result in the recognition event, joined before matching.
+ * Testing each segment separately used to miss the phrase whenever the
+ * recogniser split it across results, which it does often.
+ */
+export function matchesWakePhrase(
+  segments: string[],
+  phrases: string[] = DEFAULT_WAKE_PHRASES
+): boolean {
+  const heard = normalise(segments.join(' '));
+  if (!heard) return false;
+  return phrases.some((phrase) => heard.includes(phrase));
 }
 
 /**
@@ -490,18 +517,18 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWord {
     };
 
     recognition.onresult = (event) => {
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const heard = normalise(event.results[i][0]?.transcript ?? '');
-        if (!heard) continue;
-        if (phrasesRef.current.some((phrase) => heard.includes(phrase))) {
-          try {
-            recognition.stop();
-          } catch {
-            // Stopping a stopped recogniser is not an error worth surfacing.
-          }
-          onDetectedRef.current();
-          return;
+      const segments: string[] = [];
+      for (let i = 0; i < event.results.length; i++) {
+        segments.push(event.results[i][0]?.transcript ?? '');
+      }
+
+      if (matchesWakePhrase(segments, phrasesRef.current)) {
+        try {
+          recognition.stop();
+        } catch {
+          // Stopping a stopped recogniser is not an error worth surfacing.
         }
+        onDetectedRef.current();
       }
     };
 
