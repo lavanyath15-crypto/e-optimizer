@@ -36,3 +36,69 @@
   background: #767680;
 }
 
+
+/* ---------------------------------------------------------------------------
+ * Print
+ *
+ * "Export PDF" on a report calls window.print(), so the print stylesheet is the
+ * export format. Without these rules the output was a screenshot of the app:
+ * navigation, the floating assistant button and a dark sidebar burning toner
+ * down the left of every page.
+ *
+ * Chrome needs "Background graphics" enabled in the print dialog for the status
+ * colours; everything here still reads correctly without it.
+ * ------------------------------------------------------------------------- */
+@media print {
+  @page {
+    margin: 16mm;
+  }
+
+  /* Chrome and Safari drop background fills by default. Status colours are
+     meaningful here, so ask for them; it is a request, not a guarantee. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* Interface, not content: sidebar, header, the assistant button, and anything
+     opted out with .no-print. */
+  aside,
+  header,
+  #fab-ai-assistant,
+  .no-print {
+    display: none !important;
+  }
+
+  /* The layout offsets main content to clear the fixed sidebar and header. With
+     both gone, that offset is just a hole in the page. */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Screen shadows print as grey smudges. */
+  * {
+    box-shadow: none !important;
+  }
+
+  /* Keep a card from being split across a page break mid-figure. */
+  article,
+  table,
+  .print-keep-together {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 10px;
+    color: #767680;
+  }
+}

@@ -1,11 +1,15 @@
 /**
- * The plant's current grain throughput, shared across the dashboard.
+ * The plant's current operating point, shared across the dashboard.
  *
- * This used to be local state inside PlantAdvisorCard, which meant the rest of
- * the app had no idea it existed. The scenario table screened against a fixed
- * 147.4 t/day and the assistant answered questions about 147.4 t/day no matter
- * what had been typed in, while telling the operator it could see their
- * throughput. One number, one place, everything reads from here.
+ * This began as local state inside PlantAdvisorCard, which meant the rest of the
+ * app had no idea it existed: the scenario table screened against a fixed 147.4
+ * t/day and the assistant answered every question about 147.4 while telling the
+ * operator it could see their throughput.
+ *
+ * Now there is one operating point and every screen reads it. Readings entered
+ * on Process Monitor set it; Carbon, Analytics, AI Optimization and the
+ * assistant follow. It also records *where* the figure came from, so those
+ * screens can say so rather than presenting a number with no provenance.
  */
 
 import {
@@ -29,13 +33,40 @@ export const TRAINED_MAX_TPD = 165.0;
 export const GRAIN_INPUT_MIN_TPD = 1;
 export const GRAIN_INPUT_MAX_TPD = 400;
 
-const STORAGE_KEY = 'eoptimizer-grain-input';
+const STORAGE_KEY = 'eoptimizer-plant-input';
+/** The earlier key, when this held a bare number. Read once, then superseded. */
+const LEGACY_STORAGE_KEY = 'eoptimizer-grain-input';
+
+export type InputSource = 'default' | 'process-monitor' | 'advisor';
+
+export interface ProcessReadings {
+  grainInputTpd: number;
+  /** Beer column reflux, used to place the plant against the screened scenarios. */
+  refluxRatio?: number;
+}
 
 export interface PlantInput {
   grainInputTpd: number;
-  setGrainInputTpd: (value: number) => void;
+  /** Null until readings are submitted on Process Monitor. */
+  refluxRatio: number | null;
+  /** Where the current figure came from. */
+  source: InputSource;
+  /** When it was last set, for display. Null while still on the default. */
+  updatedAt: string | null;
   /** True when the current value sits outside the network's training range. */
   isExtrapolating: boolean;
+
+  /** Used by the advisory card, which only sets throughput. */
+  setGrainInputTpd: (value: number) => void;
+  /** Used by Process Monitor when readings are submitted. */
+  applyProcessReadings: (readings: ProcessReadings) => void;
+}
+
+interface StoredState {
+  grainInputTpd: number;
+  refluxRatio: number | null;
+  source: InputSource;
+  updatedAt: string | null;
 }
 
 const PlantInputContext = createContext<PlantInput | null>(null);
@@ -44,42 +75,88 @@ function clamp(value: number): number {
   return Math.min(GRAIN_INPUT_MAX_TPD, Math.max(GRAIN_INPUT_MIN_TPD, value));
 }
 
-function readStored(): number {
+const DEFAULT_STATE: StoredState = {
+  grainInputTpd: DEFAULT_GRAIN_INPUT_TPD,
+  refluxRatio: null,
+  source: 'default',
+  updatedAt: null,
+};
+
+function readStored(): StoredState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return DEFAULT_GRAIN_INPUT_TPD;
-    const parsed = Number.parseFloat(raw);
-    return Number.isFinite(parsed) ? clamp(parsed) : DEFAULT_GRAIN_INPUT_TPD;
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<StoredState>;
+      const grain = Number(parsed.grainInputTpd);
+      if (Number.isFinite(grain)) {
+        return {
+          grainInputTpd: clamp(grain),
+          refluxRatio: Number.isFinite(Number(parsed.refluxRatio))
+            ? Number(parsed.refluxRatio)
+            : null,
+          source: parsed.source ?? 'default',
+          updatedAt: parsed.updatedAt ?? null,
+        };
+      }
+    }
+
+    // Migration: earlier builds stored a bare number under a different key.
+    const legacy = Number.parseFloat(localStorage.getItem(LEGACY_STORAGE_KEY) ?? '');
+    if (Number.isFinite(legacy)) {
+      return { ...DEFAULT_STATE, grainInputTpd: clamp(legacy) };
+    }
   } catch {
-    // Storage can be unavailable in private mode.
-    return DEFAULT_GRAIN_INPUT_TPD;
+    // Corrupt or unavailable storage falls back to the default.
   }
+
+  return DEFAULT_STATE;
 }
 
 export function PlantInputProvider({ children }: { children: ReactNode }) {
-  const [grainInputTpd, setValue] = useState<number>(readStored);
+  const [state, setState] = useState<StoredState>(readStored);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, String(grainInputTpd));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
-      // Entered value still works for this session.
+      // Private mode: values still work for this session.
     }
-  }, [grainInputTpd]);
+  }, [state]);
+
+  const stamp = () =>
+    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const setGrainInputTpd = useCallback((value: number) => {
     if (!Number.isFinite(value)) return;
-    setValue(clamp(value));
+    setState((prev) => ({
+      ...prev,
+      grainInputTpd: clamp(value),
+      source: 'advisor',
+      updatedAt: stamp(),
+    }));
+  }, []);
+
+  const applyProcessReadings = useCallback((readings: ProcessReadings) => {
+    if (!Number.isFinite(readings.grainInputTpd)) return;
+    setState((prev) => ({
+      grainInputTpd: clamp(readings.grainInputTpd),
+      refluxRatio: Number.isFinite(readings.refluxRatio ?? NaN)
+        ? (readings.refluxRatio as number)
+        : prev.refluxRatio,
+      source: 'process-monitor',
+      updatedAt: stamp(),
+    }));
   }, []);
 
   const value = useMemo<PlantInput>(
     () => ({
-      grainInputTpd,
-      setGrainInputTpd,
+      ...state,
       isExtrapolating:
-        grainInputTpd < TRAINED_MIN_TPD || grainInputTpd > TRAINED_MAX_TPD,
+        state.grainInputTpd < TRAINED_MIN_TPD || state.grainInputTpd > TRAINED_MAX_TPD,
+      setGrainInputTpd,
+      applyProcessReadings,
     }),
-    [grainInputTpd, setGrainInputTpd]
+    [state, setGrainInputTpd, applyProcessReadings]
   );
 
   return <PlantInputContext.Provider value={value}>{children}</PlantInputContext.Provider>;
@@ -91,4 +168,16 @@ export function usePlantInput(): PlantInput {
     throw new Error('usePlantInput must be used inside a PlantInputProvider');
   }
   return context;
+}
+
+/** One sentence describing where the current figure came from. */
+export function describeSource(source: InputSource, updatedAt: string | null): string {
+  switch (source) {
+    case 'process-monitor':
+      return `From your Process Monitor readings${updatedAt ? `, submitted at ${updatedAt}` : ''}`;
+    case 'advisor':
+      return `Set on the AI Optimization screen${updatedAt ? ` at ${updatedAt}` : ''}`;
+    default:
+      return 'Nominal default. Submit readings on Process Monitor to use your own';
+  }
 }

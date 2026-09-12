@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Cpu, Gauge, Droplets, Flame, Wind, Play, Pause, RotateCcw, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Cpu, Gauge, Droplets, Flame, Wind, Play, Pause, RotateCcw, CheckCircle2, AlertTriangle, Save } from 'lucide-react';
 import {
   PROCESS_UNITS,
   PROCESS_DEFAULTS,
@@ -9,6 +9,9 @@ import {
   clampToField,
   formatValue,
 } from '../data/processUnits';
+import { bushelsPerHourToTonnesPerDay } from '../lib/grainFeed';
+import { usePlantInput } from '../hooks/usePlantInput';
+import { SubmittedReadingResult } from './SubmittedReadingResult';
 
 const STORAGE_KEY = 'eoptimizer-process-inputs';
 
@@ -52,6 +55,8 @@ export const ProcessMonitorView: React.FC = () => {
   const [values, setValues] = useState<ProcessValues>(loadValues);
   // Raw text per input so a half-typed value like "1." is not clobbered mid-edit.
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [submittedAt, setSubmittedAt] = useState<string | null>(null);
+  const { applyProcessReadings } = usePlantInput();
 
   useEffect(() => {
     try {
@@ -87,7 +92,65 @@ export const ProcessMonitorView: React.FC = () => {
   const resetUnit = (unitId: string) => {
     setValues((prev) => ({ ...prev, [unitId]: { ...PROCESS_DEFAULTS[unitId] } }));
     setDrafts({});
+    setSubmittedAt(null);
   };
+
+  /**
+   * Applies every pending edit at once.
+   *
+   * Fields commit on blur, so typing a value and hitting Submit without leaving
+   * the box would otherwise discard it. This flushes the drafts first, which is
+   * the behaviour the button implies.
+   */
+  const submitReadings = () => {
+    setValues((prev) => {
+      const next: ProcessValues = { ...prev };
+
+      for (const u of PROCESS_UNITS) {
+        for (const field of u.fields) {
+          const raw = drafts[`${u.id}.${field.key}`];
+          if (raw === undefined) continue;
+
+          const parsed = parseFloat(raw);
+          // Same rule as commit(): junk keeps the previous reading rather than
+          // silently writing the field minimum.
+          if (Number.isNaN(parsed)) continue;
+
+          next[u.id] = { ...next[u.id], [field.key]: clampToField(field, parsed) };
+        }
+      }
+
+      return next;
+    });
+
+    setDrafts({});
+    setSubmittedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+    // Push the readings that other screens can actually use. Drafts are read
+    // directly because the setValues above has not flushed yet at this point.
+    const readingOf = (unitId: string, fieldKey: string): number => {
+      const unit = PROCESS_UNITS.find((u) => u.id === unitId)!;
+      const field = unit.fields.find((f) => f.key === fieldKey)!;
+      const draft = drafts[`${unitId}.${fieldKey}`];
+
+      if (draft !== undefined) {
+        const parsed = parseFloat(draft);
+        if (!Number.isNaN(parsed)) return clampToField(field, parsed);
+      }
+      return values[unitId][fieldKey];
+    };
+
+    applyProcessReadings({
+      // Bushels per hour off the mill scale is what an operator reads; tonnes
+      // per day is what the network takes.
+      grainInputTpd: bushelsPerHourToTonnesPerDay(readingOf('milling', 'feedRate')),
+      // Not a model input, but it places the plant against the screened
+      // scenarios on the Carbon and AI Optimization screens.
+      refluxRatio: readingOf('distillation', 'refluxRatio'),
+    });
+  };
+
+  const pendingCount = Object.keys(drafts).length;
 
   const outOfBandCount = unit.fields.filter(
     (f) => !isInBand(f, values[unit.id][f.key])
@@ -283,13 +346,49 @@ export const ProcessMonitorView: React.FC = () => {
             })}
           </div>
 
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#e0e3e6]">
+            <div className="text-[11px] min-h-[18px]">
+              {pendingCount > 0 ? (
+                <span className="text-[#8a6100] font-semibold flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    {pendingCount} unsaved {pendingCount === 1 ? 'edit' : 'edits'}
+                  </span>
+                </span>
+              ) : submittedAt ? (
+                <span className="text-[#2D6A4F] font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Readings saved to this browser at {submittedAt}</span>
+                </span>
+              ) : (
+                <span className="text-[#767680]">
+                  Readings save as you go. Submit applies anything still being typed.
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={submitReadings}
+              className="flex items-center gap-1.5 px-5 py-2 bg-[#0f6e8c] hover:bg-[#0b5670] text-white rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer shrink-0"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Submit Readings</span>
+            </button>
+          </div>
+
           <p className="text-[10px] text-[#767680] pt-1 border-t border-[#e0e3e6]">
             Heads up: those normal bands are typical dry-mill numbers, not your commissioned
             limits. Swap them for your real ones before anyone makes a call off this screen.
-            What you type stays in this browser.
+            Submitting stores what you type in this browser only. Nothing is sent to a DCS or
+            historian, and nothing is written to a server.
           </p>
         </div>
       </div>
+
+      {submittedAt && (
+        <SubmittedReadingResult enteredRefluxRatio={values.distillation.refluxRatio} />
+      )}
     </div>
   );
 };

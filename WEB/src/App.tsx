@@ -7,7 +7,6 @@ import { Header } from './components/Header';
 import { ReportsView } from './components/ReportsView';
 import { OverviewView } from './components/OverviewView';
 import { ProcessMonitorView } from './components/ProcessMonitorView';
-import { EnergyIntelligenceView } from './components/EnergyIntelligenceView';
 import { CarbonEmissionsView } from './components/CarbonEmissionsView';
 import { AiOptimizationView } from './components/AiOptimizationView';
 import { RecommendationsView } from './components/RecommendationsView';
@@ -207,15 +206,13 @@ export default function App() {
 
           {currentTab === 'process-monitor' && <ProcessMonitorView />}
 
-          {currentTab === 'energy' && <EnergyIntelligenceView />}
-
-          {currentTab === 'carbon' && <CarbonEmissionsView />}
+          {currentTab === 'carbon' && <CarbonEmissionsView onNavigateTab={setCurrentTab} />}
 
           {currentTab === 'ai-optimization' && <AiOptimizationView />}
 
-          {currentTab === 'recommendations' && <RecommendationsView />}
+          {currentTab === 'recommendations' && <RecommendationsView onNavigateTab={setCurrentTab} />}
 
-          {currentTab === 'analytics' && <AnalyticsView />}
+          {currentTab === 'analytics' && <AnalyticsView onNavigateTab={setCurrentTab} />}
 
           {currentTab === 'settings' && <SettingsSupportView initialTab="settings" />}
 

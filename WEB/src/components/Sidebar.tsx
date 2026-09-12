@@ -4,7 +4,6 @@ import { useOperator } from '../hooks/useOperator';
 import {
   LayoutDashboard,
   Cpu,
-  Zap,
   Leaf,
   BrainCircuit,
   Sparkles,
@@ -34,13 +33,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const operator = useOperator();
 
   const navItems: { id: TabType; label: string; icon: React.ReactNode; badge?: number }[] = [
-    { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-5 h-5" /> },
+    // Order follows the data: readings go in at Process Monitor, then Carbon and
+    // Analytics show what they mean, then AI Optimization and Recommendations
+    // say what to do about it.
     { id: 'process-monitor', label: 'Process Monitor', icon: <Cpu className="w-5 h-5" /> },
-    { id: 'energy', label: 'Energy Intelligence', icon: <Zap className="w-5 h-5" /> },
     { id: 'carbon', label: 'Carbon & CO2e', icon: <Leaf className="w-5 h-5" /> },
+    { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" /> },
     { id: 'ai-optimization', label: 'AI Optimization', icon: <BrainCircuit className="w-5 h-5" /> },
     { id: 'recommendations', label: 'Recommendations', icon: <Sparkles className="w-5 h-5" /> },
-    { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" /> },
+    // Overview reads as a summary of the screens above it, so it sits after
+    // them rather than first, with Reports last.
+    { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> }
   ];
 

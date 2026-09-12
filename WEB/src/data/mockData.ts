@@ -1,4 +1,4 @@
-import { ReportItem, PlantAlarm, PlantMetric, AiOptimizationSetpoint } from '../types';
+import { ReportItem, PlantAlarm, AiOptimizationSetpoint } from '../types';
 
 export const ASSETS = {
   operatorAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCHiO0Bs6ZfUtTNof6unWjxT6MC9ztJbixQxsLt4aKV9-j1r12v2Or7yn07BGlQ0nC97iwZtj6_am0e3Age6K9BmnBPho9sIJhHWHiFoEus85dJ_vQXleiZ9P7hDFLHWvrsKfKFmrmQr7LUOSs-Q0f-NTZWtDyQdpWkgYnQlgictv5bSsQHT1BltB35Thd0Y3KP62bVAdjW5k65L8nndOcHAQxsTMvl4CwRKz4GOBmZUIDLukFES5g',
@@ -254,15 +254,6 @@ export const INITIAL_REPORTS: ReportItem[] = [
       ]
     }
   }
-];
-
-export const PLANT_METRICS: PlantMetric[] = [
-  { id: 'm-1', label: 'Ethanol Production Rate', value: '4,850', unit: 'gal/hr', target: '4,800', status: 'optimal', trend: 'up', changePercentage: '+2.4%' },
-  { id: 'm-2', label: 'Specific Energy Consumption', value: '1.41', unit: 'kWh/gal', target: '1.48', status: 'optimal', trend: 'down', changePercentage: '-4.7%' },
-  { id: 'm-3', label: 'Distillation Steam Pressure', value: '148.5', unit: 'PSI', target: '150.0', status: 'optimal', trend: 'stable', changePercentage: '-0.2%' },
-  { id: 'm-4', label: 'Fermentation Hall Average Temp', value: '89.2', unit: '°F', target: '88-90', status: 'optimal', trend: 'stable', changePercentage: '+0.1%' },
-  { id: 'm-5', label: 'Carbon Intensity Score', value: '52.4', unit: 'gCO2e/MJ', target: '<55.0', status: 'optimal', trend: 'down', changePercentage: '-4.8%' },
-  { id: 'm-6', label: 'Grain Starch Conversion', value: '98.4%', unit: '%', target: '97.5%', status: 'optimal', trend: 'up', changePercentage: '+0.9%' }
 ];
 
 export const PLANT_ALARMS: PlantAlarm[] = [

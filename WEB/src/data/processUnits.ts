@@ -34,7 +34,13 @@ export const PROCESS_UNITS: ProcessUnit[] = [
     name: 'Milling',
     equipment: 'Hammermill 1-3',
     fields: [
-      { key: 'feedRate', label: 'Grain Feed Rate', unit: 'bu/hr', min: 0, max: 6000, step: 10, normalMin: 3000, normalMax: 3800, decimals: 0 },
+      // Sized to the plant the model was trained on, not to a typical US dry
+      // mill. 3,000-3,800 bu/hr was here before, which works out at roughly
+      // 2,100 t/day: a plant fourteen times the 147.4 t/day in the dataset. Now
+      // that submitting a reading drives the prediction, that gap would have
+      // pushed the network far outside its trained range on the first submit.
+      // The band below is the 124.5-165 t/day training range converted.
+      { key: 'feedRate', label: 'Grain Feed Rate', unit: 'bu/hr', min: 0, max: 2000, step: 1, normalMin: 205, normalMax: 270, decimals: 0 },
       { key: 'moisture', label: 'Grain Moisture', unit: '%', min: 0, max: 30, step: 0.1, normalMin: 13, normalMax: 15.5, decimals: 1 },
       { key: 'screenSize', label: 'Screen Size', unit: 'mm', min: 1, max: 10, step: 0.1, normalMin: 2.8, normalMax: 4, decimals: 1 },
     ],
@@ -91,7 +97,8 @@ export const PROCESS_UNITS: ProcessUnit[] = [
 export type ProcessValues = Record<string, Record<string, number>>;
 
 export const PROCESS_DEFAULTS: ProcessValues = {
-  milling: { feedRate: 3420, moisture: 14.2, screenSize: 3.2 },
+  // 242 bu/hr is 147.4 t/day, the nominal throughput used across the dashboard.
+  milling: { feedRate: 242, moisture: 14.2, screenSize: 3.2 },
   liquefaction: { cookTemp: 225.4, ph: 5.65, enzymeDose: 12.5 },
   fermentation: { abv: 14.82, temp: 89.2, durationH: 54 },
   // refluxRatio matches scenario S4, the current operating point in distillationEngine.

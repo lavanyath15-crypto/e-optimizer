@@ -223,7 +223,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           <div className="px-5 py-2.5 bg-[#f2f4f7] border-b border-[#e0e3e6] flex items-center justify-between text-xs text-[#45464f]">
             <div className="flex items-center gap-1.5 font-mono">
               <Zap className="w-3.5 h-3.5 text-[#0f6e8c]" />
-              <span>Throughput: <strong>{grainInputTpd} t/day</strong></span>
+              <span>Throughput: <strong>{grainInputTpd.toFixed(1)} t/day</strong></span>
             </div>
             <div className="flex items-center gap-1.5 font-mono">
               <span>Model: <strong>{model ? 'loaded' : 'loading'}</strong></span>

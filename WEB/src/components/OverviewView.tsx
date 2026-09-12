@@ -1,10 +1,9 @@
 import React from 'react';
-import { PLANT_METRICS, PLANT_ALARMS, INITIAL_REPORTS } from '../data/mockData';
+import { PLANT_ALARMS, INITIAL_REPORTS } from '../data/mockData';
 import { TabType, ReportItem } from '../types';
+import { usePlantFigures } from '../hooks/usePlantFigures';
+import { buildPlantMetrics, formatMetricValue, isWeak } from '../lib/plantMetrics';
 import {
-  Activity,
-  Zap,
-  TrendingUp,
   AlertTriangle,
   FileText,
   Sparkles,
@@ -26,6 +25,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onViewReport,
   onOpenAiAssistant
 }) => {
+  const { model, consumption, emissions, loading, error, grainInputTpd } = usePlantFigures();
+  const metrics =
+    model && consumption && emissions ? buildPlantMetrics(consumption, emissions, model) : [];
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Top Header */}
@@ -60,30 +63,71 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
+      {/* KPI cards, computed live from the network and the emission formulas at
+          the throughput set on the AI Optimization screen. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <p className="text-[#45464f]">
+          Computed at{' '}
+          <strong className="font-mono text-[#061449]">{grainInputTpd.toFixed(1)}</strong> t/day of
+          grain.{' '}
+          <button
+            onClick={() => onNavigateTab('ai-optimization')}
+            className="text-[#0f6e8c] font-bold hover:underline cursor-pointer"
+          >
+            Change throughput
+          </button>
+        </p>
+      </div>
+
+      {error && (
+        <div className="flex items-start gap-2 p-3.5 bg-[#BA1A1A]/5 border border-[#BA1A1A]/25 rounded-xl text-xs text-[#BA1A1A]">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>Could not load the consumption model: {error}</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {PLANT_METRICS.map((metric) => (
+        {loading &&
+          Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={`skeleton-${i}`}
+              className="bg-white rounded-xl p-5 border border-[#e0e3e6] h-[132px] animate-pulse"
+            />
+          ))}
+
+        {metrics.map((metric) => (
           <div
             key={metric.id}
             className="bg-white rounded-xl p-5 border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] hover:border-[#3d93ad]/40 transition-all"
           >
-            <div className="flex items-center justify-between text-xs text-[#767680] font-semibold mb-1">
+            <div className="flex items-center justify-between text-xs text-[#767680] font-semibold mb-1 gap-2">
               <span>{metric.label}</span>
-              <span className="text-[#2D6A4F] bg-[#2D6A4F]/10 px-2 py-0.5 rounded-full font-bold">
-                {metric.changePercentage}
-              </span>
+              {metric.r2 !== null && (
+                <span
+                  className={`px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                    isWeak(metric)
+                      ? 'bg-[#FFB703]/20 text-[#8a6100]'
+                      : 'bg-[#2D6A4F]/10 text-[#2D6A4F]'
+                  }`}
+                >
+                  R2 {metric.r2.toFixed(2)}
+                </span>
+              )}
             </div>
             <div className="flex items-baseline gap-2 mt-2">
               <span className="text-3xl font-extrabold text-[#061449] font-mono">
-                {metric.value}
+                {formatMetricValue(metric)}
               </span>
-              <span className="text-sm font-semibold text-[#767680]">
-                {metric.unit}
-              </span>
+              <span className="text-sm font-semibold text-[#767680]">{metric.unit}</span>
             </div>
-            <div className="mt-3 pt-3 border-t border-[#e0e3e6]/60 flex items-center justify-between text-xs text-[#45464f]">
-              <span>Engineered Target: <strong>{metric.target} {metric.unit}</strong></span>
-              <span className="text-[#2D6A4F] font-bold">Optimal</span>
+            <div className="mt-3 pt-3 border-t border-[#e0e3e6]/60 text-xs text-[#45464f]">
+              {isWeak(metric) ? (
+                <span className="text-[#8a6100] font-semibold">
+                  {metric.hint} &mdash; weak fit, treat as indicative
+                </span>
+              ) : (
+                <span>{metric.hint}</span>
+              )}
             </div>
           </div>
         ))}

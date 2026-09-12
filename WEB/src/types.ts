@@ -2,7 +2,6 @@ export type TabType =
   | 'reports'
   | 'overview'
   | 'process-monitor'
-  | 'energy'
   | 'carbon'
   | 'ai-optimization'
   | 'recommendations'
@@ -59,15 +58,28 @@ export interface PlantAlarm {
   recommendation: string;
 }
 
+/**
+ * A headline figure on the Overview screen.
+ *
+ * `value` is a number, not a preformatted string. It used to be `'4,850'` with
+ * the thousands separator and sometimes the unit baked in, which made the type
+ * unusable for anything but rendering: nothing could compare, total or chart it.
+ * Formatting is now the view's job and `decimals` says how.
+ */
 export interface PlantMetric {
   id: string;
   label: string;
-  value: string;
+  value: number;
   unit: string;
-  target: string;
-  status: 'optimal' | 'warning' | 'critical';
-  trend: 'up' | 'down' | 'stable';
-  changePercentage: string;
+  decimals: number;
+  /**
+   * Held-out test R2 for a value the network predicts, so the screen can show
+   * how far to trust it. Null for figures derived by formula, which carry no
+   * prediction error of their own.
+   */
+  r2: number | null;
+  /** Short note under the value, e.g. what the figure is derived from. */
+  hint?: string;
 }
 
 export interface AiOptimizationSetpoint {

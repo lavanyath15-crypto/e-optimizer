@@ -1,42 +1,46 @@
 import React, { useState } from 'react';
-import { Sparkles, DollarSign, ArrowRight, CheckCircle2, ChevronRight } from 'lucide-react';
-import { IllustrativeDataBanner } from './IllustrativeDataBanner';
+import { Sparkles, Bot, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { usePlantFigures } from '../hooks/usePlantFigures';
+import { buildPlantState } from '../lib/plantState';
+import { getRecommendations } from '@backend/recommend.js';
+import { DatasetAnalysisCard } from './DatasetAnalysisCard';
+import { TabType } from '../types';
 
-export const RecommendationsView: React.FC = () => {
-  const [appliedList, setAppliedList] = useState<string[]>([]);
+interface RecommendationsViewProps {
+  onNavigateTab?: (tab: TabType) => void;
+}
 
-  const recs = [
-    {
-      id: 'rec-1',
-      title: 'Shift Centrifuge CIP to Low-Tariff Off-Peak Window',
-      category: 'Energy Cost Optimization',
-      impact: '$4,200 / month savings',
-      payback: 'Immediate (Zero CapEx)',
-      description: 'Move Clean-in-Place (CIP) wash sequence for Decanter Centrifuges 1-4 from 15:00 to 22:00 to avoid high demand rate window.',
-      effort: 'Low'
-    },
-    {
-      id: 'rec-2',
-      title: 'Beer Column Pre-Heater Tube Bundle Descaling',
-      category: 'Thermal Recovery',
-      impact: '1.2 k-lbs/hr steam reduction ($38,000 / yr)',
-      payback: '1.5 months',
-      description: 'Fouling factor on Exchanger E-101 has risen to 0.0028 hr-ft²-°F/Btu. Chemical flush will restore approach temperature from 18°F to 9°F.',
-      effort: 'Medium'
-    },
-    {
-      id: 'rec-3',
-      title: 'Mash Enzyme Dosage Micro-Modulation',
-      category: 'Chemical Consumables',
-      impact: '$18,500 / month savings',
-      payback: 'Immediate',
-      description: 'Adjust alpha-amylase and glucoamylase pump flow proportional to inbound corn starch NIR spectrometer curve rather than fixed volumetric ratio.',
-      effort: 'Low'
-    }
-  ];
+/**
+ * Recommendations generated from the plant's own figures.
+ *
+ * This screen used to be three hardcoded worked examples with invented savings
+ * ("$4,200 / month", a fouling factor of 0.0028) and an Adopt button that only
+ * marked the card locally. It now runs the same path the AI Optimization screen
+ * does: model output and screened scenarios go to the LLM, which is told to use
+ * only the numbers it is given.
+ */
+export const RecommendationsView: React.FC<RecommendationsViewProps> = ({ onNavigateTab }) => {
+  const { model, loading, error, grainInputTpd } = usePlantFigures();
 
-  const handleApply = (id: string) => {
-    setAppliedList((prev) => [...prev, id]);
+  const [advice, setAdvice] = useState<string | null>(null);
+  const [provider, setProvider] = useState<string | null>(null);
+  const [adviceError, setAdviceError] = useState<string | null>(null);
+  const [isAsking, setIsAsking] = useState(false);
+
+  const generate = async () => {
+    if (!model) return;
+
+    setIsAsking(true);
+    setAdvice(null);
+    setAdviceError(null);
+    setProvider(null);
+
+    const result = await getRecommendations(buildPlantState(model, grainInputTpd));
+
+    setAdvice(result.recommendations);
+    setProvider(result.provider);
+    setAdviceError(result.error);
+    setIsAsking(false);
   };
 
   return (
@@ -50,72 +54,94 @@ export const RecommendationsView: React.FC = () => {
             Plant Recommendations
           </h2>
           <p className="text-xs text-[#45464f] mt-1">
-            What to fix first. Ranked by what it saves you, what carbon it cuts, and whether it's safe to try.
+            What to change, written from your own figures at{' '}
+            <strong className="font-mono">{grainInputTpd.toFixed(1)}</strong> t/day. Nothing here is
+            a stock
+            suggestion.
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={generate}
+          disabled={isAsking || loading || !model}
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#0f6e8c] hover:bg-[#0b5670] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer shrink-0"
+        >
+          {isAsking ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : advice ? (
+            <RefreshCw className="w-3.5 h-3.5" />
+          ) : (
+            <Bot className="w-3.5 h-3.5" />
+          )}
+          <span>{isAsking ? 'Analysing...' : advice ? 'Regenerate' : 'Generate Recommendations'}</span>
+        </button>
       </div>
 
-      <IllustrativeDataBanner>
-        These three cards are worked examples, not findings from your plant. The savings,
-        payback periods and fouling factors are invented to show the format, and
-        "Adopt Recommendation" only marks the card locally. The recommendations that are
-        actually generated from your figures, by the model and the LLM, are on the AI
-        Optimization screen.
-      </IllustrativeDataBanner>
+      {error && (
+        <div className="flex items-start gap-2 p-3.5 bg-[#BA1A1A]/5 border border-[#BA1A1A]/25 rounded-xl text-xs text-[#BA1A1A]">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>Could not load the consumption model: {error}</span>
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {recs.map((rec) => {
-          const isDone = appliedList.includes(rec.id);
+      {adviceError && (
+        <div className="flex items-start gap-2 p-3.5 bg-[#BA1A1A]/5 border border-[#BA1A1A]/25 rounded-xl text-xs text-[#BA1A1A]">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{adviceError}</span>
+        </div>
+      )}
 
-          return (
-            <div
-              key={rec.id}
-              className="bg-white rounded-xl p-6 border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] flex flex-col justify-between space-y-4 hover:border-[#3d93ad]/40 transition-all"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-[#0f6e8c] uppercase tracking-wider">
-                    {rec.category}
-                  </span>
-                  <span className="px-2 py-0.5 bg-[#f2f4f7] rounded-full font-semibold text-[#45464f]">
-                    {rec.effort} Effort
-                  </span>
-                </div>
+      {!advice && !isAsking && !adviceError && (
+        <div className="bg-white rounded-xl border border-dashed border-[#c6c5d1] p-10 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-[#0f6e8c]/10 flex items-center justify-center mx-auto text-[#0f6e8c]">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <h3 className="font-bold text-base text-[#061449]">Nothing generated yet</h3>
+          <p className="text-xs text-[#767680] max-w-md mx-auto leading-relaxed">
+            Recommendations are written on demand from your current throughput, the model's predicted
+            consumption and the screened distillation scenarios. They are not cached, so what you get
+            reflects the numbers on screen right now.
+          </p>
+        </div>
+      )}
 
-                <h3 className="text-base font-bold text-[#061449] leading-snug">
-                  {rec.title}
-                </h3>
+      {isAsking && (
+        <div className="bg-white rounded-xl border border-[#e0e3e6] p-6 space-y-3">
+          <div className="h-3 bg-[#eceef1] rounded animate-pulse w-3/4" />
+          <div className="h-3 bg-[#eceef1] rounded animate-pulse w-full" />
+          <div className="h-3 bg-[#eceef1] rounded animate-pulse w-5/6" />
+          <div className="h-3 bg-[#eceef1] rounded animate-pulse w-2/3" />
+        </div>
+      )}
 
-                <p className="text-xs text-[#45464f] leading-relaxed">
-                  {rec.description}
-                </p>
+      <DatasetAnalysisCard />
 
-                <div className="p-3 bg-[#2D6A4F]/10 rounded-lg text-xs font-bold text-[#2D6A4F] flex items-center gap-1.5">
-                  <DollarSign className="w-4 h-4 shrink-0" />
-                  <span>{rec.impact}</span>
-                </div>
-              </div>
+      {advice && (
+        <div className="bg-white rounded-xl border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] p-6 space-y-4">
+          <p className="text-sm text-[#191c1e] whitespace-pre-line leading-relaxed">{advice}</p>
 
-              <div className="pt-3 border-t border-[#e0e3e6]/60">
-                {isDone ? (
-                  <div className="flex items-center justify-center gap-1.5 py-2.5 bg-[#2D6A4F] text-white rounded-lg text-xs font-bold">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Queued for Shift Supervisor</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleApply(rec.id)}
-                    className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-[#061449] hover:bg-[#1e2a5e] text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    <span>Adopt Recommendation</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+          <div className="pt-3 border-t border-[#e0e3e6] space-y-2">
+            {provider && (
+              <p className="text-[11px] text-[#767680]">
+                Written by an open-weight model via {provider}. Every figure it cites came from the
+                network and the emission formulas; the model only puts them into sentences.
+              </p>
+            )}
+            <p className="text-[11px] text-[#767680]">
+              Sanity-check against the scenario table before changing anything on the plant.{' '}
+              {onNavigateTab && (
+                <button
+                  onClick={() => onNavigateTab('ai-optimization')}
+                  className="text-[#0f6e8c] font-bold hover:underline cursor-pointer"
+                >
+                  Open AI Optimization
+                </button>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

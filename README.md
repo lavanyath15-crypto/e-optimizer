@@ -33,7 +33,6 @@ Most dashboards blur this line. Here it is straight, so you know what you're loo
 | Process stage readings | **Yours to enter.** Defaults are typical dry-mill values, saved to your browser |
 | Reports, alarms, sensor streams | **Mock.** Nothing is wired to a historian yet |
 | Carbon & CO2e Ledger screen | **Illustrative.** CI score, Scope 1/2 tonnages and the capture credit are fixed demo values. Not run through GREET, LCFS, RFS2 or RED II |
-| Energy Intelligence screen | **Illustrative.** Totals, costs and the load profile are fixed. The 24h/7d/30d buttons don't change the data |
 | Plant Analytics screen | **Illustrative.** Sample trend series. The metric buttons change the label only |
 | Plant Recommendations screen | **Illustrative.** Worked examples. The savings and payback figures are invented |
 | AI Optimization setpoints | **Illustrative**, except the distillation scenario table and advisory card below them, which are real |
