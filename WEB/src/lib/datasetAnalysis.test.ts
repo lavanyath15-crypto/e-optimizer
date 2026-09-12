@@ -12,6 +12,7 @@ import {
   DATASET_LIMITS,
   DatasetError,
   analyseDataset,
+  analysePerformance,
   columnStats,
   detectDelimiter,
   detectTimeSpan,
@@ -338,5 +339,123 @@ describe('detectTimeSpan', () => {
   it('ignores a date-named column that does not parse', () => {
     const parsed = parseDataset('Date,v\nnot-a-date,1\nalso-not,2\n');
     expect(detectTimeSpan(parsed.headers, parsed.rows)).toBeNull();
+  });
+});
+
+describe('analysePerformance', () => {
+  /**
+   * Steady 100 t/day (39 kL) with steam alternating between an efficient and a
+   * wasteful day, so best quartile and worst quartile are known by construction.
+   */
+  const build = (steamPerDay: number[]) =>
+    parseDataset(
+      'Grain_Input_tpd,Distillation_Steam_kg\n' +
+        steamPerDay.map((s) => `100,${s}`).join('\n') +
+        '\n'
+    );
+
+  it('separates best from worst quartile on specific consumption', () => {
+    // 39 kL/day, so 39,000 kg -> 1000 kg/kL and 78,000 -> 2000 kg/kL.
+    const rows = build([
+      ...Array(8).fill(39_000),
+      ...Array(8).fill(58_500),
+      ...Array(8).fill(78_000),
+    ]);
+    const { bands } = analysePerformance(rows.headers, rows.rows, 0);
+    const steam = bands.find((b) => /steam/i.test(b.measure))!;
+
+    expect(steam.bestQuartile).toBeCloseTo(1000, 0);
+    expect(steam.worstQuartile).toBeCloseTo(2000, 0);
+    expect(steam.overallMean).toBeCloseTo(1500, 0);
+  });
+
+  it('values the gap in absolute units per day, not per kL', () => {
+    const rows = build([...Array(12).fill(39_000), ...Array(12).fill(78_000)]);
+    const { bands } = analysePerformance(rows.headers, rows.rows, 0);
+    const steam = bands.find((b) => /steam/i.test(b.measure))!;
+
+    // Average 1500 kg/kL, best 1000, gap 500 kg/kL x 39 kL = 19,500 kg/day.
+    expect(steam.savingPerDay).toBeCloseTo(19_500, -2);
+    expect(steam.absoluteUnit).toBe('kg');
+    expect(steam.savingOverPeriod).toBeCloseTo(steam.savingPerDay * steam.days, -2);
+  });
+
+  it('reports no saving when every day is identical', () => {
+    const { bands } = analysePerformance(...(() => {
+      const p = build(Array(20).fill(39_000));
+      return [p.headers, p.rows, 0] as const;
+    })());
+    const steam = bands.find((b) => /steam/i.test(b.measure))!;
+
+    expect(steam.savingPerDay).toBeCloseTo(0, 6);
+    expect(steam.coefficientOfVariation).toBeCloseTo(0, 6);
+  });
+
+  it('detects a worsening drift', () => {
+    // Specific consumption climbing steadily across the period.
+    const rising = Array.from({ length: 30 }, (_, i) => 39_000 + i * 800);
+    const p = build(rising);
+    const { trends } = analysePerformance(p.headers, p.rows, 0);
+    const steam = trends.find((t) => /steam/i.test(t.measure))!;
+
+    expect(steam.direction).toBe('worsening');
+    expect(steam.changePctOverPeriod).toBeGreaterThan(2);
+  });
+
+  it('detects an improving drift', () => {
+    const falling = Array.from({ length: 30 }, (_, i) => 78_000 - i * 800);
+    const p = build(falling);
+    const { trends } = analysePerformance(p.headers, p.rows, 0);
+    const steam = trends.find((t) => /steam/i.test(t.measure))!;
+
+    expect(steam.direction).toBe('improving');
+    expect(steam.changePctOverPeriod).toBeLessThan(-2);
+  });
+
+  it('calls a steady period flat rather than inventing a trend', () => {
+    const p = build(Array(30).fill(39_000));
+    const { trends } = analysePerformance(p.headers, p.rows, 0);
+    expect(trends.find((t) => /steam/i.test(t.measure))!.direction).toBe('flat');
+  });
+
+  it('skips a series too short to say anything about', () => {
+    const p = build(Array(5).fill(39_000));
+    expect(analysePerformance(p.headers, p.rows, 0).bands).toEqual([]);
+  });
+
+  it('ignores rows with zero or missing throughput rather than dividing by zero', () => {
+    const p = parseDataset(
+      'Grain_Input_tpd,Distillation_Steam_kg\n' +
+        '0,39000\n,39000\n' +
+        Array(20).fill('100,39000').join('\n') +
+        '\n'
+    );
+    const { bands } = analysePerformance(p.headers, p.rows, 0);
+    const steam = bands.find((b) => /steam/i.test(b.measure))!;
+
+    expect(steam.days).toBe(20);
+    expect(Number.isFinite(steam.overallMean)).toBe(true);
+  });
+});
+
+describe('summaryForPrompt carries the analysis, not just the description', () => {
+  const p = parseDataset(
+    'Date,Grain_Input_tpd,Distillation_Steam_kg\n' +
+      Array.from({ length: 24 }, (_, i) => `2026-01-${String(i + 1).padStart(2, '0')},100,${39_000 + i * 1_500}`).join('\n') +
+      '\n'
+  );
+  const prompt = summaryForPrompt(analyseDataset('year.csv', p, model));
+
+  it('includes the best-quartile prize', () => {
+    expect(prompt).toMatch(/Best-quartile versus average/);
+    expect(prompt).toMatch(/Closing average to best quartile/);
+  });
+
+  it('includes the drift', () => {
+    expect(prompt).toMatch(/Drift across the period/);
+  });
+
+  it('is still small enough for the backend to accept', () => {
+    expect(prompt.length).toBeLessThan(6_000);
   });
 });

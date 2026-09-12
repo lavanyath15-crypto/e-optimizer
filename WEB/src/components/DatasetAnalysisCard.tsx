@@ -287,6 +287,92 @@ export const DatasetAnalysisCard: React.FC = () => {
             </div>
           )}
 
+          {/* The headline finding, computed before the LLM is involved. Best
+              quartile is what the plant already achieved on its better days, so
+              it is demonstrated rather than a target someone invented. */}
+          {summary.bands.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-[#061449]">
+                Best days vs average
+                <span className="ml-2 font-normal text-[#767680]">
+                  what this plant has already proved it can run at
+                </span>
+              </h4>
+
+              <div className="space-y-3">
+                {summary.bands.map((b) => {
+                  const trend = summary.trends.find((t) => t.measure === b.measure);
+                  const span = b.worstQuartile - b.bestQuartile;
+                  const pos = span > 0 ? ((b.overallMean - b.bestQuartile) / span) * 100 : 50;
+
+                  return (
+                    <div
+                      key={b.measure}
+                      className="p-3.5 bg-[#f7f9fc] rounded-lg border border-[#e0e3e6] space-y-2"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="text-xs font-bold text-[#061449]">{b.measure}</span>
+                        {/* Below half a percent the "saving" is rounding, not a
+                            finding. Saying so beats printing 1 kWh/day. */}
+                        {b.savingPct < 0.5 ? (
+                          <span className="text-xs font-mono font-bold text-[#767680]">
+                            already consistent, nothing on the table
+                          </span>
+                        ) : (
+                          <span className="text-xs font-mono font-bold text-[#2D6A4F]">
+                            {fmt(b.savingPerDay, 0)} {b.absoluteUnit}/day on the table{' '}
+                            <span className="text-[#767680] font-normal">
+                              ({fmt(b.savingPct, 1)}%)
+                            </span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Best to worst, with the average marked on it. */}
+                      <div className="relative h-2 bg-gradient-to-r from-[#2D6A4F]/30 via-[#FFB703]/30 to-[#BA1A1A]/30 rounded-full">
+                        <div
+                          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-4 bg-[#061449] rounded-full"
+                          style={{ left: `${Math.min(100, Math.max(0, pos))}%` }}
+                          title="Your average"
+                        />
+                      </div>
+
+                      <div className="flex justify-between text-[10px] font-mono text-[#767680]">
+                        <span>best {fmt(b.bestQuartile, 1)}</span>
+                        <span className="text-[#061449] font-bold">
+                          avg {fmt(b.overallMean, 1)} {b.unit}
+                        </span>
+                        <span>worst {fmt(b.worstQuartile, 1)}</span>
+                      </div>
+
+                      <p className="text-[10px] text-[#767680]">
+                        {b.savingPct >= 0.5 &&
+                          `${fmt(b.savingOverPeriod, 0)} ${b.absoluteUnit} over ${b.days} days. `}
+                        Day-to-day spread {fmt(b.coefficientOfVariation, 1)}%
+                        {b.coefficientOfVariation > 15 && ', which is wide enough to suggest control rather than equipment'}
+                        .
+                        {trend && trend.direction !== 'flat' && (
+                          <span
+                            className={
+                              trend.direction === 'worsening'
+                                ? ' text-[#8a6100] font-semibold'
+                                : ' text-[#2D6A4F] font-semibold'
+                            }
+                          >
+                            {' '}
+                            Drifted {trend.changePctOverPeriod >= 0 ? '+' : ''}
+                            {fmt(trend.changePctOverPeriod, 1)}% across the period (
+                            {trend.direction}).
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* What actually moves consumption in THEIR plant. The project's own
               dataset found nothing above |r| = 0.19 outside throughput; theirs
               may differ, and that difference is the finding. */}

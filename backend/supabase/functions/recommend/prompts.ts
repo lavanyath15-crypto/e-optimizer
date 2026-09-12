@@ -76,25 +76,30 @@ Rules you must follow:
 - Call out any column whose range, standard deviation or sign looks physically implausible, and say why.
 - Respect the data quality flags and caveats at the end of the summary.
 
+You are being read by someone who already knows what is in their own file. Do not spend the answer describing it back to them. Every section must say something they did not already know, and lead with the number that matters.
+
 Structure your answer with these exact headings:
 
-WHAT THIS DATASET IS
-One or two sentences: period covered, how many rows, what it appears to measure.
+THE HEADLINE
+Two or three sentences. The single most valuable thing in this data, quantified. Usually the gap between best-quartile and average performance, because that is a saving the plant has already demonstrated it can achieve. Give it in the plant's own units per day and across the period. No preamble about what the dataset contains.
 
-AGAINST THE MODEL
-Where the plant sits versus prediction, per measure, with figures. If nothing could be compared, say why.
+THE PRIZE
+Per measure: best quartile, average, and what closing that gap is worth per day and over the period. Say plainly that the best quartile is not a target someone invented, it is what this plant already ran at on its better days. Where day-to-day spread is high, say that the variability itself is the problem and that it points at control rather than equipment.
+
+DIRECTION OF TRAVEL
+Whether specific consumption drifted over the period, by how much, and what that implies. A worsening trend with stable throughput usually means fouling, drift or a degrading control loop. Say if it is flat.
 
 WHAT MOVES CONSUMPTION HERE
-What the correlations suggest drives consumption in THIS plant, and how that compares to throughput being the only signal in the training data. Name the strongest relationships with their r values.
+What the correlations suggest drives consumption in THIS plant, with r values. Compare to throughput being the only signal in the training data. If a lever correlates here that did not there, that is the finding, so say so.
 
-WORTH INVESTIGATING
-Three to five items, most valuable first. Each one: what to check, why the data points there, and roughly what it could be worth. Number them.
+AGAINST THE MODEL
+Where the plant sits versus prediction. A low or negative R2 means the model does not describe this plant, which is a statement about the model. Say which it is. Keep this short: it is the least useful section.
 
-DATA QUALITY
-Anything that would undermine the above: gaps, constants, implausible ranges, short periods.
+DO THIS NEXT
+Three to five numbered actions, most valuable first. Each one: what to do, which number in the data justifies it, and roughly what it is worth. An engineer should be able to start one of these tomorrow. No generic advice such as "monitor more closely".
 
 WHAT THIS CANNOT TELL YOU
-The honest limits. Be specific to this dataset rather than generic.
+Specific to this dataset, not generic caveats.
 
 Formatting: this is rendered as plain text in a proportional font, so do not use markdown tables. Pipes and dashes will not line up and the result is unreadable. Put each measure on its own line instead, like:
 

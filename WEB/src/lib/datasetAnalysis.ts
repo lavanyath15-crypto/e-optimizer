@@ -425,6 +425,159 @@ export function qualityFlags(stats: ColumnStats[], rowCount: number): string[] {
   return flags;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Performance analysis                                                        */
+/*                                                                            */
+/* The part that makes an upload worth doing.                                  */
+/*                                                                            */
+/* Descriptive statistics tell an operator what they already know: how much    */
+/* steam they use on average. What they cannot easily get is the shape of the  */
+/* distribution, and specifically the gap between their good days and their    */
+/* ordinary ones. That gap is the single most actionable number in plant       */
+/* energy work, because the best quartile is proof by demonstration: the plant */
+/* has already run at that intensity, with that equipment, so it is attainable */
+/* rather than theoretical.                                                    */
+/* -------------------------------------------------------------------------- */
+
+export interface PerformanceBand {
+  measure: string;
+  unit: string;
+  /** Mean of the best quarter of days, by specific consumption. */
+  bestQuartile: number;
+  medianValue: number;
+  worstQuartile: number;
+  overallMean: number;
+  /** What closing the average to best-quartile would save, per day, in absolute units. */
+  savingPerDay: number;
+  savingPct: number;
+  /** The same over the period the file covers. */
+  savingOverPeriod: number;
+  absoluteUnit: string;
+  days: number;
+  /** Spread relative to the mean. High means the process is poorly controlled. */
+  coefficientOfVariation: number;
+}
+
+export interface TrendResult {
+  measure: string;
+  unit: string;
+  /** Percent change across the whole period, from a least-squares fit. */
+  changePctOverPeriod: number;
+  direction: 'improving' | 'worsening' | 'flat';
+}
+
+/** Least-squares slope of y against its own index. */
+function slope(values: number[]): number {
+  const n = values.length;
+  if (n < 4) return 0;
+
+  const meanX = (n - 1) / 2;
+  const meanY = values.reduce((s, v) => s + v, 0) / n;
+
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (i - meanX) * (values[i] - meanY);
+    den += (i - meanX) ** 2;
+  }
+  return den === 0 ? 0 : num / den;
+}
+
+function quantile(sorted: number[], q: number): number {
+  if (sorted.length === 0) return 0;
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+/**
+ * Specific consumption per row, banded into quartiles.
+ *
+ * Specific rather than absolute, because absolute consumption mostly tracks how
+ * much grain went in that day. Dividing by production is what exposes whether
+ * the plant was running efficiently, independent of rate.
+ */
+export function analysePerformance(
+  headers: string[],
+  rows: string[][],
+  grainIndex: number
+): { bands: PerformanceBand[]; trends: TrendResult[] } {
+  const bands: PerformanceBand[] = [];
+  const trends: TrendResult[] = [];
+
+  for (const known of KNOWN_COLUMNS.slice(1)) {
+    const columnIndex = headers.findIndex((h) =>
+      known.aliases.some((alias) => normalise(h).includes(alias))
+    );
+    if (columnIndex === -1) continue;
+
+    // Specific consumption, in order, so a trend can be read off it.
+    const specific: number[] = [];
+    const absolutePerUnit: number[] = [];
+
+    for (const row of rows) {
+      const grain = toNumber(row[grainIndex]);
+      const value = toNumber(row[columnIndex]);
+      if (grain === null || value === null || grain <= 0) continue;
+
+      const productionKl = (grain * 390) / 1000;
+      if (productionKl <= 0) continue;
+
+      specific.push(value / productionKl);
+      absolutePerUnit.push(productionKl);
+    }
+
+    if (specific.length < 12) continue;
+
+    const sorted = [...specific].sort((a, b) => a - b);
+    const mean = specific.reduce((s, v) => s + v, 0) / specific.length;
+    if (mean <= 0) continue;
+
+    // Lower specific consumption is better, so the best quartile is the bottom.
+    const bestQuartile = sorted.slice(0, Math.max(1, Math.floor(sorted.length / 4)));
+    const worstQuartile = sorted.slice(-Math.max(1, Math.floor(sorted.length / 4)));
+    const bestMean = bestQuartile.reduce((s, v) => s + v, 0) / bestQuartile.length;
+    const worstMean = worstQuartile.reduce((s, v) => s + v, 0) / worstQuartile.length;
+
+    const variance =
+      specific.reduce((s, v) => s + (v - mean) ** 2, 0) / Math.max(1, specific.length - 1);
+
+    // Converted back to absolute units using the period's average production,
+    // so the saving reads in kg or kWh rather than kg per kL.
+    const avgProduction =
+      absolutePerUnit.reduce((s, v) => s + v, 0) / absolutePerUnit.length;
+    const savingPerDay = (mean - bestMean) * avgProduction;
+
+    bands.push({
+      measure: known.label,
+      unit: `${known.unit.split('/')[0]}/kL`,
+      bestQuartile: bestMean,
+      medianValue: quantile(sorted, 0.5),
+      worstQuartile: worstMean,
+      overallMean: mean,
+      savingPerDay,
+      savingPct: ((mean - bestMean) / mean) * 100,
+      savingOverPeriod: savingPerDay * specific.length,
+      absoluteUnit: known.unit.split('/')[0],
+      days: specific.length,
+      coefficientOfVariation: (Math.sqrt(variance) / mean) * 100,
+    });
+
+    const perStep = slope(specific);
+    const changePct = ((perStep * (specific.length - 1)) / mean) * 100;
+    trends.push({
+      measure: known.label,
+      unit: `${known.unit.split('/')[0]}/kL`,
+      changePctOverPeriod: changePct,
+      // Rising specific consumption means the plant is getting less efficient.
+      direction: Math.abs(changePct) < 2 ? 'flat' : changePct > 0 ? 'worsening' : 'improving',
+    });
+  }
+
+  return { bands, trends };
+}
+
 /** First column that parses as dates, with the span it covers. */
 export function detectTimeSpan(
   headers: string[],
@@ -487,6 +640,10 @@ export interface DatasetSummary {
   comparisons: ModelComparison[];
   /** Strongest column-to-consumption relationships found in their data. */
   correlations: Correlation[];
+  /** Best-quartile versus average performance: what the plant has already proved it can do. */
+  bands: PerformanceBand[];
+  /** Whether specific consumption drifted over the period. */
+  trends: TrendResult[];
   /** Column-level problems worth knowing before acting on any of it. */
   qualityFlags: string[];
   timeSpan: { column: string; from: string; to: string; days: number } | null;
@@ -599,6 +756,10 @@ export function analyseDataset(
   const correlations =
     targets.length > 0 ? findCorrelations(parsed.headers, parsed.rows, targets).slice(0, 10) : [];
 
+  const performance = grainStats
+    ? analysePerformance(parsed.headers, parsed.rows, parsed.headers.indexOf(grainStats.name))
+    : { bands: [], trends: [] };
+
   return {
     fileName,
     rowCount: parsed.rows.length,
@@ -608,6 +769,8 @@ export function analyseDataset(
     grainColumn: grainStats?.name ?? null,
     comparisons,
     correlations,
+    bands: performance.bands,
+    trends: performance.trends,
     qualityFlags: qualityFlags(stats, parsed.rows.length),
     timeSpan: detectTimeSpan(parsed.headers, parsed.rows),
     warnings,
@@ -660,6 +823,36 @@ export function summaryForPrompt(summary: DatasetSummary): string {
       '',
       'Bias above zero means the plant consumes more than the model expects for its throughput.'
     );
+  }
+
+  if (summary.bands.length > 0) {
+    lines.push(
+      '',
+      'Best-quartile versus average performance.',
+      'The best quartile is what this plant actually achieved on its better days, with the same',
+      'equipment, so it is demonstrated rather than theoretical. The saving is what closing the',
+      'average to that level would be worth.'
+    );
+    for (const b of summary.bands) {
+      lines.push(
+        `  ${b.measure}: best quartile ${round(b.bestQuartile, 1)} ${b.unit}, ` +
+          `median ${round(b.medianValue, 1)}, ` +
+          `average ${round(b.overallMean, 1)}, ` +
+          `worst quartile ${round(b.worstQuartile, 1)}. ` +
+          `Closing average to best quartile = ${round(b.savingPerDay, 0)} ${b.absoluteUnit}/day ` +
+          `(${round(b.savingPct, 1)}%), ${round(b.savingOverPeriod, 0)} ${b.absoluteUnit} over ${b.days} days. ` +
+          `Day-to-day spread ${round(b.coefficientOfVariation, 1)}%.`
+      );
+    }
+  }
+
+  if (summary.trends.length > 0) {
+    lines.push('', 'Drift across the period (least-squares fit on specific consumption):');
+    for (const t of summary.trends) {
+      lines.push(
+        `  ${t.measure}: ${t.changePctOverPeriod >= 0 ? '+' : ''}${round(t.changePctOverPeriod, 1)}% ${t.direction}`
+      );
+    }
   }
 
   if (summary.correlations.length > 0) {
