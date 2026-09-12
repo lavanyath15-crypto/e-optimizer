@@ -3,6 +3,7 @@ import { PLANT_ALARMS, INITIAL_REPORTS } from '../data/mockData';
 import { TabType, ReportItem } from '../types';
 import { usePlantFigures } from '../hooks/usePlantFigures';
 import { buildPlantMetrics, formatMetricValue, isWeak } from '../lib/plantMetrics';
+import { ReadingSourceBar } from './ReadingSourceBar';
 import {
   AlertTriangle,
   FileText,
@@ -25,7 +26,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onViewReport,
   onOpenAiAssistant
 }) => {
-  const { model, consumption, emissions, loading, error, grainInputTpd } = usePlantFigures();
+  const { model, consumption, emissions, loading, error, grainInputTpd, source, updatedAt } =
+    usePlantFigures();
   const metrics =
     model && consumption && emissions ? buildPlantMetrics(consumption, emissions, model) : [];
 
@@ -64,20 +66,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       </div>
 
       {/* KPI cards, computed live from the network and the emission formulas at
-          the throughput set on the AI Optimization screen. */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <p className="text-[#45464f]">
-          Computed at{' '}
-          <strong className="font-mono text-[#061449]">{grainInputTpd.toFixed(1)}</strong> t/day of
-          grain.{' '}
-          <button
-            onClick={() => onNavigateTab('ai-optimization')}
-            className="text-[#0f6e8c] font-bold hover:underline cursor-pointer"
-          >
-            Change throughput
-          </button>
-        </p>
-      </div>
+          whatever throughput was last submitted on Process Monitor. */}
+      <ReadingSourceBar
+        grainInputTpd={grainInputTpd}
+        source={source}
+        updatedAt={updatedAt}
+        onNavigateTab={onNavigateTab}
+      />
 
       {error && (
         <div className="flex items-start gap-2 p-3.5 bg-[#BA1A1A]/5 border border-[#BA1A1A]/25 rounded-xl text-xs text-[#BA1A1A]">

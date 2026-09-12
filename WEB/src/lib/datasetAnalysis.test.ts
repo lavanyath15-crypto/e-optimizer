@@ -13,7 +13,12 @@ import {
   DatasetError,
   analyseDataset,
   columnStats,
+  detectDelimiter,
+  detectTimeSpan,
   parseCsv,
+  parseDataset,
+  pearson,
+  qualityFlags,
   summaryForPrompt,
 } from './datasetAnalysis';
 
@@ -212,5 +217,126 @@ describe('summaryForPrompt', () => {
     );
 
     expect(wide).toMatch(/further numeric columns/);
+  });
+});
+
+describe('detectDelimiter', () => {
+  it('finds comma, tab, semicolon and pipe', () => {
+    expect(detectDelimiter('a,b,c\n1,2,3\n')).toBe(',');
+    expect(detectDelimiter('a\tb\tc\n1\t2\t3\n')).toBe('\t');
+    expect(detectDelimiter('a;b;c\n1;2;3\n')).toBe(';');
+    expect(detectDelimiter('a|b|c\n1|2|3\n')).toBe('|');
+  });
+
+  it('is not fooled by a delimiter inside a quoted header', () => {
+    // European export: semicolon separated, comma inside a quoted name.
+    expect(detectDelimiter('"Boiler, B-1";steam;temp\n1;2;3\n')).toBe(';');
+  });
+
+  it('defaults to comma for a single column', () => {
+    expect(detectDelimiter('value\n1\n2\n')).toBe(',');
+  });
+});
+
+describe('parseDataset', () => {
+  it('reads a tab-separated export', () => {
+    const parsed = parseDataset('a\tb\n1\t2\n3\t4\n');
+    expect(parsed.headers).toEqual(['a', 'b']);
+    expect(parsed.rows).toEqual([['1', '2'], ['3', '4']]);
+  });
+
+  it('reads a semicolon-separated export', () => {
+    const parsed = parseDataset('a;b\n1;2\n');
+    expect(parsed.headers).toEqual(['a', 'b']);
+  });
+
+  it('reads a JSON array of rows', () => {
+    const parsed = parseDataset('[{"a":1,"b":2},{"a":3,"b":4}]', 'x.json');
+    expect(parsed.headers).toEqual(['a', 'b']);
+    expect(parsed.rows).toEqual([['1', '2'], ['3', '4']]);
+  });
+
+  it('reads the common JSON wrapper shapes', () => {
+    expect(parseDataset('{"data":[{"a":1}]}').headers).toEqual(['a']);
+    expect(parseDataset('{"rows":[{"b":2}]}').headers).toEqual(['b']);
+  });
+
+  it('takes the union of keys, so a field missing from row one survives', () => {
+    const parsed = parseDataset('[{"a":1},{"a":2,"b":9}]');
+    expect(parsed.headers).toEqual(['a', 'b']);
+    expect(parsed.rows[0]).toEqual(['1', '']);
+  });
+
+  it('rejects JSON with no rows', () => {
+    expect(() => parseDataset('{"nothing":true}')).toThrow(DatasetError);
+    expect(() => parseDataset('[]')).toThrow(DatasetError);
+  });
+
+  it('rejects malformed JSON with a clear message', () => {
+    expect(() => parseDataset('{ broken', 'x.json')).toThrow(/not valid JSON/i);
+  });
+});
+
+describe('pearson', () => {
+  it('is 1 for a perfect positive relationship', () => {
+    expect(pearson([1, 2, 3, 4], [2, 4, 6, 8])).toBeCloseTo(1, 9);
+  });
+
+  it('is -1 for a perfect inverse relationship', () => {
+    expect(pearson([1, 2, 3, 4], [8, 6, 4, 2])).toBeCloseTo(-1, 9);
+  });
+
+  it('is 0 when either side is constant, rather than NaN', () => {
+    expect(pearson([1, 2, 3], [5, 5, 5])).toBe(0);
+    expect(Number.isFinite(pearson([5, 5, 5], [1, 2, 3]))).toBe(true);
+  });
+
+  it('is 0 with too few points to mean anything', () => {
+    expect(pearson([1], [2])).toBe(0);
+  });
+});
+
+describe('qualityFlags', () => {
+  const base = { count: 100, missing: 0, min: 1, max: 10, mean: 5, stdDev: 2, constant: false };
+
+  it('flags a constant column', () => {
+    const flags = qualityFlags([{ ...base, name: 'Setpoint', min: 5, max: 5, constant: true }], 100);
+    expect(flags.join(' ')).toMatch(/Constant across every row/);
+  });
+
+  it('flags a column with many gaps', () => {
+    const flags = qualityFlags([{ ...base, name: 'pH', missing: 40 }], 100);
+    expect(flags.join(' ')).toMatch(/missing/i);
+  });
+
+  it('flags a negative value in a quantity that cannot go below zero', () => {
+    const flags = qualityFlags([{ ...base, name: 'Distillation_Steam_kg', min: -12 }], 100);
+    expect(flags.join(' ')).toMatch(/Negative values/);
+  });
+
+  it('says nothing about a clean dataset', () => {
+    expect(qualityFlags([{ ...base, name: 'Grain_Input_tpd' }], 100)).toEqual([]);
+  });
+});
+
+describe('detectTimeSpan', () => {
+  it('finds the period from a date column', () => {
+    const parsed = parseDataset('Date,v\n2026-01-01,1\n2026-01-10,2\n2026-01-05,3\n');
+    const span = detectTimeSpan(parsed.headers, parsed.rows);
+
+    expect(span?.column).toBe('Date');
+    expect(span?.from).toBe('2026-01-01');
+    expect(span?.to).toBe('2026-01-10');
+    expect(span?.days).toBe(10);
+  });
+
+  it('returns null when there is no date column', () => {
+    const parsed = parseDataset('a,b\n1,2\n3,4\n');
+    expect(detectTimeSpan(parsed.headers, parsed.rows)).toBeNull();
+  });
+
+  it('ignores a date-named column that does not parse', () => {
+    const parsed = parseDataset('Date,v\nnot-a-date,1\nalso-not,2\n');
+    expect(detectTimeSpan(parsed.headers, parsed.rows)).toBeNull();
   });
 });

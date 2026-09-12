@@ -15,7 +15,7 @@ import {
   DATASET_LIMITS,
   DatasetError,
   analyseDataset as analyseLocally,
-  parseCsv,
+  parseDataset,
   summaryForPrompt,
   type DatasetSummary,
 } from '../lib/datasetAnalysis';
@@ -66,7 +66,8 @@ export const DatasetAnalysisCard: React.FC = () => {
       }
 
       const text = await file.text();
-      const parsed = parseCsv(text);
+      // Dispatches on content: CSV, TSV, semicolon- or pipe-delimited, or JSON.
+      const parsed = parseDataset(text, file.name);
       setSummary(analyseLocally(file.name, parsed, model));
     } catch (err) {
       setParseError(
@@ -148,7 +149,7 @@ export const DatasetAnalysisCard: React.FC = () => {
           </div>
 
           <p className="text-sm font-bold text-[#061449]">
-            {isParsing ? 'Reading your file...' : 'Drop a CSV here'}
+            {isParsing ? 'Reading your file...' : 'Drop an export here'}
           </p>
           <p className="text-xs text-[#767680] mt-1">
             or{' '}
@@ -161,16 +162,19 @@ export const DatasetAnalysisCard: React.FC = () => {
             </button>
           </p>
           <p className="text-[11px] text-[#767680] mt-3">
-            Up to {DATASET_LIMITS.fileBytes / 1024 / 1024} MB and{' '}
-            {DATASET_LIMITS.rows.toLocaleString()} rows. Name a column{' '}
-            <span className="font-mono">Grain_Input_tpd</span> to have consumption scored against the
-            model.
+            CSV, TSV, semicolon or pipe delimited, or JSON. The separator is detected, so there is no
+            need to convert anything. Up to {DATASET_LIMITS.fileBytes / 1024 / 1024} MB and{' '}
+            {DATASET_LIMITS.rows.toLocaleString()} rows.
+          </p>
+          <p className="text-[11px] text-[#767680] mt-1">
+            Name a column <span className="font-mono">Grain_Input_tpd</span> to have consumption
+            scored against the model. Excel needs exporting to CSV first.
           </p>
 
           <input
             ref={inputRef}
             type="file"
-            accept=".csv,text/csv,text/plain"
+            accept=".csv,.tsv,.txt,.json,.dat,text/csv,text/plain,application/json"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -197,6 +201,8 @@ export const DatasetAnalysisCard: React.FC = () => {
                 <p className="text-[11px] text-[#767680]">
                   {summary.rowCount.toLocaleString()} rows, {summary.columnCount} columns,{' '}
                   {summary.numericColumns.length} numeric
+                  {summary.timeSpan &&
+                    ` · ${summary.timeSpan.from} to ${summary.timeSpan.to} (${summary.timeSpan.days}d)`}
                 </p>
               </div>
             </div>
@@ -278,6 +284,73 @@ export const DatasetAnalysisCard: React.FC = () => {
                 throughput. A low or negative R2 means the model does not explain your data well,
                 which says as much about the model as about your plant.
               </p>
+            </div>
+          )}
+
+          {/* What actually moves consumption in THEIR plant. The project's own
+              dataset found nothing above |r| = 0.19 outside throughput; theirs
+              may differ, and that difference is the finding. */}
+          {summary.correlations.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-[#061449]">
+                What moves consumption here
+                <span className="ml-2 font-normal text-[#767680]">
+                  strongest correlations in your data
+                </span>
+              </h4>
+
+              <div className="space-y-1.5">
+                {summary.correlations.slice(0, 6).map((c) => {
+                  const strength = Math.min(100, Math.abs(c.r) * 100);
+                  const notable = Math.abs(c.r) >= 0.3;
+                  return (
+                    <div key={`${c.column}-${c.against}`} className="space-y-1">
+                      <div className="flex items-baseline justify-between text-[11px] gap-3">
+                        <span className="text-[#45464f] truncate">
+                          <span className="font-mono font-bold text-[#061449]">{c.column}</span>
+                          <span className="text-[#767680]"> vs {c.against}</span>
+                        </span>
+                        <span
+                          className={`font-mono font-bold shrink-0 ${
+                            notable ? 'text-[#0f6e8c]' : 'text-[#767680]'
+                          }`}
+                        >
+                          r = {c.r.toFixed(3)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[#eceef1] h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            notable ? 'bg-[#0f6e8c]' : 'bg-[#c6c5d1]'
+                          }`}
+                          style={{ width: `${strength}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-[10px] text-[#767680]">
+                Single-variable correlations on operating data, where levers tend to move together,
+                so these suggest rather than prove. For scale: in the synthetic dataset this model
+                was trained on, nothing except throughput exceeded |r| = 0.19.
+              </p>
+            </div>
+          )}
+
+          {summary.qualityFlags.length > 0 && (
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-bold text-[#061449]">Data quality</h4>
+              {summary.qualityFlags.map((flag) => (
+                <div
+                  key={flag}
+                  className="flex items-start gap-2 p-2.5 bg-[#FFB703]/10 border border-[#FFB703]/40 rounded-lg text-[11px] text-[#8a6100]"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{flag}</span>
+                </div>
+              ))}
             </div>
           )}
 
