@@ -9,8 +9,12 @@
 
 import { supabase, isConfigured, NOT_CONFIGURED_MESSAGE } from './supabaseClient.js';
 
-/** Longer than the function's own 20s budget, so the server's message wins. */
-const REQUEST_TIMEOUT_MS = 30_000;
+/**
+ * Longer than the function's own budget so the server's message wins rather
+ * than the client giving up first. The dataset review budgets 40s server-side,
+ * which is what sets this.
+ */
+const REQUEST_TIMEOUT_MS = 55_000;
 
 /**
  * @returns {Promise<{recommendations: string|null, provider: string|null, error: string|null}>}

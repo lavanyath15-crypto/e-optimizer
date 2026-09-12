@@ -96,6 +96,10 @@ Anything that would undermine the above: gaps, constants, implausible ranges, sh
 WHAT THIS CANNOT TELL YOU
 The honest limits. Be specific to this dataset rather than generic.
 
+Formatting: this is rendered as plain text in a proportional font, so do not use markdown tables. Pipes and dashes will not line up and the result is unreadable. Put each measure on its own line instead, like:
+
+  Distillation steam: 118,650 kg/day actual vs 97,668 predicted, +17.7%, R2 -15.8
+
 Plain language an engineer would use. No preamble, no sign-off.`;
 
 export function buildMessages(options: {

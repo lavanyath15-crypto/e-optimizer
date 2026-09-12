@@ -57,7 +57,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const { mode, state, question, history, datasetSummary } = await parseRequest(req);
     const messages = buildMessages({ mode, state, question, history, datasetSummary });
-    const completion = await complete(messages);
+
+    // Sized per mode. A dataset review is asked for six headed sections and was
+    // being cut off mid-table at the 600 tokens that suit a short recommendation.
+    const completion = await complete(
+      messages,
+      mode === 'dataset'
+        ? { maxTokens: 2_200, budgetMs: 40_000 }
+        : { maxTokens: 700, budgetMs: 20_000 }
+    );
 
     return json(
       200,

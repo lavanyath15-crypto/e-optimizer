@@ -22,9 +22,20 @@ import type { ChatMessage } from './prompts.ts';
  * no ceiling on the total, so two slow providers meant a 50s request and a
  * client that had long since given up. Each attempt now draws from one clock.
  */
-const TOTAL_BUDGET_MS = 20_000;
+const DEFAULT_BUDGET_MS = 20_000;
 /** Below this there is no point starting another provider. */
 const MIN_ATTEMPT_MS = 3_000;
+
+export interface CompletionOptions {
+  /**
+   * Sized to what the prompt actually asks for. A dataset review is asked for
+   * six headed sections and was being cut off mid-sentence at the 600 that suits
+   * a three-line recommendation.
+   */
+  maxTokens?: number;
+  /** Longer answers need longer to generate. */
+  budgetMs?: number;
+}
 
 interface Provider {
   name: string;
@@ -58,7 +69,8 @@ async function callProvider(
   provider: Provider,
   apiKey: string,
   messages: ChatMessage[],
-  timeoutMs: number
+  timeoutMs: number,
+  maxTokens: number
 ): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -67,7 +79,12 @@ async function callProvider(
     const res = await fetch(provider.url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: provider.model, temperature: 0.2, max_tokens: 600, messages }),
+      body: JSON.stringify({
+        model: provider.model,
+        temperature: 0.2,
+        max_tokens: maxTokens,
+        messages,
+      }),
       signal: controller.signal,
     });
 
@@ -96,7 +113,13 @@ async function callProvider(
  * Failures are logged with their provider and reason; the caller sees only that
  * the service is unavailable.
  */
-export async function complete(messages: ChatMessage[]): Promise<Completion> {
+export async function complete(
+  messages: ChatMessage[],
+  options: CompletionOptions = {}
+): Promise<Completion> {
+  const maxTokens = options.maxTokens ?? 600;
+  const budgetMs = options.budgetMs ?? DEFAULT_BUDGET_MS;
+
   const startedAt = Date.now();
   let sawConfiguredProvider = false;
 
@@ -108,14 +131,14 @@ export async function complete(messages: ChatMessage[]): Promise<Completion> {
     }
     sawConfiguredProvider = true;
 
-    const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
+    const remaining = budgetMs - (Date.now() - startedAt);
     if (remaining < MIN_ATTEMPT_MS) {
       logError('provider_budget_exhausted', { provider: provider.name, remaining });
       break;
     }
 
     try {
-      const text = await callProvider(provider, apiKey, messages, remaining);
+      const text = await callProvider(provider, apiKey, messages, remaining, maxTokens);
       return { text, provider: provider.name, model: provider.model };
     } catch (err) {
       logError('provider_failed', {
