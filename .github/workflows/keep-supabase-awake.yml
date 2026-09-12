@@ -11,7 +11,7 @@
 #
 # Setup, once:
 #   Repository Settings > Secrets and variables > Actions > New repository secret
-#     SUPABASE_URL       your project URL
+#     SUPABASE_URL       e.g. https://yourproject.supabase.co
 #     SUPABASE_ANON_KEY  the anon public key
 #
 # Both are public by design and already ship in the browser bundle, so they are
@@ -37,50 +37,104 @@ jobs:
     steps:
       - name: Query the database
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          RAW_URL: ${{ secrets.SUPABASE_URL }}
+          RAW_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
-          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
-            echo "::error::SUPABASE_URL and SUPABASE_ANON_KEY must be set as repository secrets."
+          # Secrets are pasted by hand, so they routinely arrive with a trailing
+          # newline, surrounding quotes, a trailing slash, or no scheme. curl
+          # exits 3 ("URL malformed") on any of those and the run fails with no
+          # useful message. Normalise before using them.
+          url=$(printf '%s' "${RAW_URL:-}" | tr -d '\r\n' | tr -d '"' | tr -d "'" | xargs)
+          key=$(printf '%s' "${RAW_KEY:-}" | tr -d '\r\n' | tr -d '"' | tr -d "'" | xargs)
+
+          if [ -z "$url" ]; then
+            echo "::error::Repository secret SUPABASE_URL is missing or empty."
+            echo "Add it under Settings > Secrets and variables > Actions."
             exit 1
           fi
+
+          if [ -z "$key" ]; then
+            echo "::error::Repository secret SUPABASE_ANON_KEY is missing or empty."
+            exit 1
+          fi
+
+          # Accept a bare host and add the scheme, rather than failing on it.
+          case "$url" in
+            https://*|http://*) ;;
+            *) url="https://$url" ;;
+          esac
+          # Strip any trailing slashes so the path does not end up doubled.
+          url="${url%/}"
+
+          # Reported without the value, so a wrong secret is diagnosable without
+          # printing it. GitHub masks secret values in logs anyway.
+          echo "URL length: ${#url}, scheme ok, key length: ${#key}"
 
           # A real PostgREST query against a real table. Supabase measures
           # activity on database queries, so an HTTP ping at the dashboard or a
           # health endpoint does not reset the timer. RLS returns no rows to an
           # anonymous caller, which is correct and still counts as a query.
           status=$(curl -s -o /tmp/body -w '%{http_code}' \
-            "${SUPABASE_URL}/rest/v1/profiles?select=id&limit=1" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "$url/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: $key" \
+            -H "Authorization: Bearer $key" \
             --max-time 30)
+          curl_exit=$?
 
-          echo "profiles query: HTTP ${status}"
-
-          if [ "${status}" != "200" ]; then
-            echo "::error::Expected 200 from the database, got ${status}."
-            cat /tmp/body
+          if [ "$curl_exit" -ne 0 ]; then
+            echo "::error::curl failed with exit code $curl_exit."
+            case "$curl_exit" in
+              3) echo "Exit 3 means the URL is malformed. Check SUPABASE_URL looks like https://yourproject.supabase.co" ;;
+              6) echo "Exit 6 means the host could not be resolved. Check the project ref in SUPABASE_URL." ;;
+              28) echo "Exit 28 means it timed out. The project may be paused and waking, so try again." ;;
+            esac
             exit 1
           fi
 
+          echo "profiles query: HTTP $status"
+
+          case "$status" in
+            200)
+              echo "Database answered. The inactivity timer is reset."
+              ;;
+            401|403)
+              echo "::error::HTTP $status. SUPABASE_ANON_KEY is wrong or does not match this project."
+              exit 1
+              ;;
+            404)
+              echo "::error::HTTP 404. The profiles table is missing. Run backend/schema.sql in the SQL Editor."
+              exit 1
+              ;;
+            *)
+              echo "::error::Unexpected HTTP $status from the database."
+              cat /tmp/body
+              exit 1
+              ;;
+          esac
+
       - name: Check the auth service
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          RAW_URL: ${{ secrets.SUPABASE_URL }}
+          RAW_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
+
+          url=$(printf '%s' "${RAW_URL:-}" | tr -d '\r\n' | tr -d '"' | tr -d "'" | xargs)
+          key=$(printf '%s' "${RAW_KEY:-}" | tr -d '\r\n' | tr -d '"' | tr -d "'" | xargs)
+          case "$url" in https://*|http://*) ;; *) url="https://$url" ;; esac
+          url="${url%/}"
 
           status=$(curl -s -o /dev/null -w '%{http_code}' \
-            "${SUPABASE_URL}/auth/v1/health" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            "$url/auth/v1/health" \
+            -H "apikey: $key" \
             --max-time 30)
 
-          echo "auth health: HTTP ${status}"
+          echo "auth health: HTTP $status"
 
           # Reported, not fatal. The database query above is what prevents the
           # pause; failing the run on an auth blip would only create noise.
-          if [ "${status}" != "200" ]; then
-            echo "::warning::Auth service returned ${status}."
+          if [ "$status" != "200" ]; then
+            echo "::warning::Auth service returned $status."
           fi
