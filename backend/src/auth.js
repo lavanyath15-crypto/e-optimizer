@@ -5,10 +5,9 @@
  * show the operator, or null on success. Nothing here throws.
  */
 
-import { supabase, isConfigured } from './supabaseClient.js';
+import { supabase, isConfigured, NOT_CONFIGURED_MESSAGE } from './supabaseClient.js';
 
-const NOT_CONFIGURED =
-  'Authentication is not configured yet. See backend/README.md to connect a Supabase project.';
+const NOT_CONFIGURED = NOT_CONFIGURED_MESSAGE;
 
 /** Turn a Supabase error into something an operator can act on. */
 function readableError(error) {
@@ -87,13 +86,18 @@ export async function getProfile() {
   const session = await getSession();
   if (!session) return null;
 
+  // maybeSingle, not single: an account created before schema.sql was run has no
+  // profile row, and that is a missing row rather than an error worth throwing.
   const { data, error } = await supabase
     .from('profiles')
     .select('id, full_name, email, plant_id')
     .eq('id', session.user.id)
-    .single();
+    .maybeSingle();
 
-  if (error) return null;
+  if (error) {
+    console.warn('[auth] Could not load profile:', error.message);
+    return null;
+  }
   return data;
 }
 
@@ -101,11 +105,19 @@ export async function getProfile() {
  * Route guard. Call at the top of a protected page: if there is no session it
  * sends the browser to the login page and resolves false.
  *
- * When Supabase is not configured this returns true so the dashboard stays
- * reachable during local UI work.
+ * Unconfigured behaviour differs by build on purpose. In dev it resolves true so
+ * the dashboard stays reachable for UI work without a Supabase project. In a
+ * production build it fails closed, because there "unconfigured" means a broken
+ * deploy, and the old behaviour served the dashboard to anyone who asked.
  */
 export async function requireSession(redirectTo = '/login.html') {
-  if (!isConfigured) return true;
+  if (!isConfigured) {
+    if (import.meta.env.DEV) return true;
+
+    console.error('[auth] Supabase is not configured in a production build. Refusing access.');
+    window.location.replace(redirectTo);
+    return false;
+  }
 
   const session = await getSession();
   if (!session) {

@@ -40,3 +40,12 @@ export function askAssistant(
   plantState: PlantState,
   history?: ChatTurn[]
 ): Promise<RecommendationResult>;
+
+/**
+ * `datasetSummary` is aggregate statistics produced in the browser, not the
+ * operator's rows. The file never leaves their machine.
+ */
+export function analyseDataset(
+  datasetSummary: string,
+  plantState: PlantState
+): Promise<RecommendationResult>;
