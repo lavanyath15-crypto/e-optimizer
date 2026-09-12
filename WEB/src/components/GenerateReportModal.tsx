@@ -9,6 +9,13 @@ interface GenerateReportModalProps {
   onGenerate: (newReport: ReportItem) => void;
 }
 
+/** yyyy-mm-dd for a date `days` before today, which is what a date input wants. */
+function isoDaysAgo(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
 export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
   isOpen,
   onClose,
@@ -16,8 +23,10 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
 }) => {
   const [reportTitle, setReportTitle] = useState('Daily Energy Consumables');
   const [category, setCategory] = useState<ReportCategory>('OPERATIONS');
-  const [startDate, setStartDate] = useState('2026-08-29');
-  const [endDate, setEndDate] = useState('2026-08-30');
+  // Relative to today rather than fixed. These were hardcoded to a date in the
+  // past, so the form opened on a stale range that drifted further out every day.
+  const [startDate, setStartDate] = useState(() => isoDaysAgo(1));
+  const [endDate, setEndDate] = useState(() => isoDaysAgo(0));
   const [format, setFormat] = useState<'PDF' | 'CSV'>('PDF');
   const [includeAiAudit, setIncludeAiAudit] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);

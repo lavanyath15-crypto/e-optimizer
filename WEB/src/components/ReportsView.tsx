@@ -263,7 +263,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 {report.status === 'generating' && (
                   <div className="w-full flex items-center justify-between px-2">
                     <div className="w-full h-10 bg-[#eceef1] rounded-md animate-pulse flex items-center justify-center text-xs text-[#767680] font-medium">
-                      Neural synthesizer compiling dataset...
+                      Sample report, generating...
                     </div>
                   </div>
                 )}

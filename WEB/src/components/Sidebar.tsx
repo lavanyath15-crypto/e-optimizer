@@ -94,16 +94,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Live Plant Status Indicator */}
+        {/* The model behind the figures. A pulsing "Grid Synced · 4.85 kGal/h"
+            used to sit here, connected to nothing. */}
         <div className="mx-4 mb-4 px-3.5 py-2 rounded-lg bg-[#1e2a5e]/70 border border-[#384378]/40 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4CC9F0] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#2D6A4F]"></span>
-            </span>
-            <span className="font-semibold text-white/90 text-[11px]">Grid Synced</span>
-          </div>
-          <span className="text-[11px] font-mono text-[#dde1ff]">4.85 kGal/h</span>
+          <span className="font-semibold text-white/90 text-[11px]">Consumption model</span>
+          <span className="text-[11px] font-mono text-[#dde1ff]">in-browser</span>
         </div>
 
         {/* Main Navigation items */}

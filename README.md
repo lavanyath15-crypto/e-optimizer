@@ -30,18 +30,26 @@ Most dashboards blur this line. Here it is straight, so you know what you're loo
 | LLM recommendations and chat | **Real.** Live call to an open-weight model, refuses to answer what it can't see |
 | Login and sessions | **Real.** Supabase auth, RLS enabled |
 | Voice in and out | **Real.** Browser Web Speech API, no packages or keys. Chrome, Edge and Safari only |
-| Process stage readings | **Yours to enter.** Defaults are typical dry-mill values, saved to your browser |
-| Reports, alarms, sensor streams | **Mock.** Nothing is wired to a historian yet |
-| Carbon & CO2e Ledger screen | **Illustrative.** CI score, Scope 1/2 tonnages and the capture credit are fixed demo values. Not run through GREET, LCFS, RFS2 or RED II |
-| Plant Analytics screen | **Illustrative.** Sample trend series. The metric buttons change the label only |
-| Plant Recommendations screen | **Illustrative.** Worked examples. The savings and payback figures are invented |
-| AI Optimization setpoints | **Illustrative**, except the distillation scenario table and advisory card below them, which are real |
-| Plant Settings | **Not persisted.** The form reports success but saves nothing |
+| Overview KPIs | **Real.** Seven figures computed from the model and the formulas, each with its R2 |
+| Carbon & CO2e Ledger | **Real.** Operational CO2e, split by source. Not a lifecycle CI, and it says so |
+| Plant Analytics | **Real.** The network's own response curve across its trained range |
+| Recommendations | **Real.** Live LLM call from your figures, plus upload-your-own-dataset |
+| Process stage readings | **Yours to enter.** Submit drives every screen above. Saved to your browser |
+| Dataset upload and analysis | **Real.** Parsed in your browser, never uploaded. Quartile banding, drift and correlations are arithmetic |
+| AI Optimization setpoints | **Illustrative**, except the distillation scenario table and advisory card, which are real |
+| Reports and alarms | **Mock.** Nothing is wired to a historian yet |
+| Plant Settings | **Not persisted.** The form says so rather than claiming success |
 | The dataset itself | **Synthetic.** Its own README says it's not for regulatory reporting |
 
-Each of those screens says the same thing in a banner at the top, so you don't have
-to come back here to remember which is which. Everything marked illustrative is
-there to show the layout; nothing on those screens is computed from your inputs.
+The screens still marked illustrative carry a banner saying so. Everything marked
+real is computed from whatever throughput you last submitted on Process Monitor,
+and says at the top where that figure came from.
+
+**The one thing that is deliberately absent:** a lifecycle carbon intensity in
+gCO2e/MJ. This measures operational energy only. Converting its figure to that
+basis reads about 8.8 against an industry range of 50 to 70, because farming,
+fertiliser N2O, transport and land use are excluded and those dominate ethanol's
+real footprint. Reporting it would be a scope error dressed up as an achievement.
 
 ---
 

@@ -66,7 +66,9 @@ export const AiOptimizationView: React.FC = () => {
 
         <div className="flex items-center gap-2 px-3 py-1.5 bg-[#3d93ad]/10 border border-[#3d93ad]/30 rounded-lg text-xs font-bold text-[#0f6e8c]">
           <BrainCircuit className="w-4 h-4" />
-          <span>Model: Industrial-Thermo-v4.2</span>
+          {/* Named after what it actually is. "Industrial-Thermo-v4.2" was here
+              before and no such model exists. */}
+          <span>Model: 2-layer MLP, 1 input, 16 hidden</span>
         </div>
       </div>
 

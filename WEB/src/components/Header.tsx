@@ -78,10 +78,11 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Trailing Actions */}
       <div className="flex items-center gap-3 md:gap-5 ml-4 md:ml-6">
         {/* Plant Status Pill */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-[#2D6A4F]/10 rounded-full border border-[#2D6A4F]/20">
-          <div className="w-2 h-2 rounded-full bg-[#2D6A4F] animate-pulse"></div>
-          <span className="text-[11px] font-bold tracking-wider text-[#061449] uppercase">
-            Plant Status: Active
+        {/* Names the plant rather than claiming a status nothing measures. A
+            pulsing green "Plant Status: Active" was here, wired to nothing. */}
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-[#eceef1] rounded-full border border-[#c6c5d1]">
+          <span className="text-[11px] font-bold tracking-wider text-[#45464f] uppercase">
+            Plant ETH-042
           </span>
         </div>
 

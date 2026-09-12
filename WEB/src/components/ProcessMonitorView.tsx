@@ -161,7 +161,7 @@ export const ProcessMonitorView: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[#e0e3e6]/60">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-[#0f6e8c] bg-[#0f6e8c]/10 px-2.5 py-0.5 rounded-full">
-            SCADA / DCS Live Telemetry
+            Operator-Entered Readings
           </span>
           <h2 className="text-3xl font-extrabold text-[#191c1e] tracking-tight mt-1">
             Process Monitor
@@ -179,7 +179,9 @@ export const ProcessMonitorView: React.FC = () => {
             }`}
           >
             {isSimulating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            <span>{isSimulating ? 'Live Telemetry Stream: Active' : 'Stream Paused'}</span>
+            {/* There is no stream. This toggles whether the cards highlight as
+                you type; it used to claim "Live Telemetry Stream: Active". */}
+            <span>{isSimulating ? 'Highlight changes: on' : 'Highlight changes: off'}</span>
           </button>
         </div>
       </div>
@@ -191,8 +193,7 @@ export const ProcessMonitorView: React.FC = () => {
             Interactive Plant Topology Map
           </h3>
           <div className="flex items-center gap-2 text-xs text-[#767680]">
-            <span className="w-2 h-2 rounded-full bg-[#2D6A4F] animate-ping"></span>
-            <span>Update rate: 1,000 ms</span>
+            <span>Values you enter, not a feed</span>
           </div>
         </div>
 
