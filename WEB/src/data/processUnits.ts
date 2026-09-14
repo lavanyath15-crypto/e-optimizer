@@ -40,7 +40,11 @@ export const PROCESS_UNITS: ProcessUnit[] = [
       // that submitting a reading drives the prediction, that gap would have
       // pushed the network far outside its trained range on the first submit.
       // The band below is the 124.5-165 t/day training range converted.
-      { key: 'feedRate', label: 'Grain Feed Rate', unit: 'bu/hr', min: 0, max: 2000, step: 1, normalMin: 205, normalMax: 270, decimals: 0 },
+      // The hard bounds are the throughput bounds: this field *is* the plant's
+      // throughput, so 1 to 656 bu/hr is 0.6 to 400 t/day. Capping the tonnage
+      // downstream instead of the bushels here is what used to let the feed rate
+      // on screen and the tonnage every other screen ran on say different things.
+      { key: 'feedRate', label: 'Grain Feed Rate', unit: 'bu/hr', min: 1, max: 656, step: 1, normalMin: 205, normalMax: 270, decimals: 0 },
       { key: 'moisture', label: 'Grain Moisture', unit: '%', min: 0, max: 30, step: 0.1, normalMin: 13, normalMax: 15.5, decimals: 1 },
       { key: 'screenSize', label: 'Screen Size', unit: 'mm', min: 1, max: 10, step: 0.1, normalMin: 2.8, normalMax: 4, decimals: 1 },
     ],
@@ -97,7 +101,9 @@ export const PROCESS_UNITS: ProcessUnit[] = [
 export type ProcessValues = Record<string, Record<string, number>>;
 
 export const PROCESS_DEFAULTS: ProcessValues = {
-  // 242 bu/hr is 147.4 t/day, the nominal throughput used across the dashboard.
+  // 242 bu/hr works out at 147.5 t/day, the closest whole bushel rate to the
+  // dataset's nominal 147.4. The two differ in the first decimal, so the figure
+  // shown after a submit is 147.5 and not the 147.4 seen before one.
   milling: { feedRate: 242, moisture: 14.2, screenSize: 3.2 },
   liquefaction: { cookTemp: 225.4, ph: 5.65, enzymeDose: 12.5 },
   fermentation: { abv: 14.82, temp: 89.2, durationH: 54 },

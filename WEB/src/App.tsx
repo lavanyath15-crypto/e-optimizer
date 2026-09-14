@@ -2,20 +2,15 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { TabType, ReportItem } from './types';
 import { INITIAL_REPORTS } from './data/mockData';
 import { useWakeWord } from './hooks/useVoice';
+import { usePlantInput } from './hooks/usePlantInput';
+import { deriveAlarms } from './lib/plantAlarms';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
-import { ReportsView } from './components/ReportsView';
-import { OverviewView } from './components/OverviewView';
-import { ProcessMonitorView } from './components/ProcessMonitorView';
-import { CarbonEmissionsView } from './components/CarbonEmissionsView';
-import { AiOptimizationView } from './components/AiOptimizationView';
-import { RecommendationsView } from './components/RecommendationsView';
-import { AnalyticsView } from './components/AnalyticsView';
-import { SettingsSupportView } from './components/SettingsSupportView';
-import { GenerateReportModal } from './components/GenerateReportModal';
-import { ReportDetailModal } from './components/ReportDetailModal';
 import { AiAssistantModal } from './components/AiAssistantModal';
 import { NotificationsModal } from './components/NotificationsModal';
+import { GenerateReportModal } from './sections/reports/GenerateReportModal';
+import { ReportDetailModal } from './sections/reports/ReportDetailModal';
+import { renderSection, type SectionContext } from './sections/registry';
 import { Bot } from 'lucide-react';
 
 const WAKE_WORD_KEY = 'eoptimizer-wake-word';
@@ -33,6 +28,10 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<TabType>('reports');
   const [reports, setReports] = useState<ReportItem[]>(INITIAL_REPORTS);
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // The bell badge counts readings outside their band. It was pinned at 2.
+  const { readings } = usePlantInput();
+  const alarmCount = deriveAlarms(readings).length;
 
   // Modals & Drawers
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -138,7 +137,7 @@ export default function App() {
     }
   };
 
-  const handleOpenAiWithPrompt = (prompt: string) => {
+  const handleOpenAiWithPrompt = (prompt: string = '') => {
     setAiAssistantPrompt(prompt);
     setIsAiAssistantOpen(true);
   };
@@ -146,6 +145,20 @@ export default function App() {
   const handleQuickRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 800);
+  };
+
+  // What the shell can do on a section's behalf. The plant's readings are not in
+  // here on purpose: a section that needs them reads the store, so it cannot be
+  // handed a copy that has gone stale.
+  const sectionContext: SectionContext = {
+    reports,
+    searchQuery,
+    navigate: setCurrentTab,
+    openGenerateModal: () => setIsGenerateModalOpen(true),
+    viewReport: (rep) => setSelectedReportForDetail(rep),
+    retryReport: handleRetryReport,
+    downloadReport: handleDownloadReport,
+    openAssistant: handleOpenAiWithPrompt,
   };
 
   return (
@@ -169,7 +182,7 @@ export default function App() {
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         onOpenNotifications={() => setIsNotificationsOpen(!isNotificationsOpen)}
         onOpenSettings={() => setCurrentTab('settings')}
-        unreadAlertsCount={2}
+        unreadAlertsCount={alarmCount}
         onQuickRefresh={handleQuickRefresh}
         isRefreshing={isRefreshing}
         wakeWordSupported={wakeWord.isSupported}
@@ -180,44 +193,10 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="pt-20 md:pt-24 pb-24 md:pb-12 px-4 md:px-8 ml-0 md:ml-64 w-full min-h-screen transition-all duration-300">
-        <div className="max-w-7xl mx-auto">
-          {currentTab === 'reports' && (
-            <ReportsView
-              reports={reports}
-              searchQuery={searchQuery}
-              onOpenGenerateModal={() => setIsGenerateModalOpen(true)}
-              onViewReport={(rep) => setSelectedReportForDetail(rep)}
-              onRetryReport={handleRetryReport}
-              onDownloadReport={handleDownloadReport}
-              onOpenAiAssistantWithPrompt={handleOpenAiWithPrompt}
-            />
-          )}
-
-          {currentTab === 'overview' && (
-            <OverviewView
-              onNavigateTab={setCurrentTab}
-              onViewReport={(rep) => setSelectedReportForDetail(rep)}
-              onOpenAiAssistant={() => {
-                setAiAssistantPrompt('Provide a high-level operational diagnosis for Plant ETH-042');
-                setIsAiAssistantOpen(true);
-              }}
-            />
-          )}
-
-          {currentTab === 'process-monitor' && <ProcessMonitorView />}
-
-          {currentTab === 'carbon' && <CarbonEmissionsView onNavigateTab={setCurrentTab} />}
-
-          {currentTab === 'ai-optimization' && <AiOptimizationView />}
-
-          {currentTab === 'recommendations' && <RecommendationsView onNavigateTab={setCurrentTab} />}
-
-          {currentTab === 'analytics' && <AnalyticsView onNavigateTab={setCurrentTab} />}
-
-          {currentTab === 'settings' && <SettingsSupportView initialTab="settings" />}
-
-          {currentTab === 'support' && <SettingsSupportView initialTab="support" />}
-        </div>
+        {/* One line, because which section is on screen is the registry's
+            business. This was nine conditionals that every new section had to be
+            threaded through by hand. */}
+        <div className="max-w-7xl mx-auto">{renderSection(currentTab, sectionContext)}</div>
       </main>
 
       {/* Floating Action Button (AI Assistant) exactly matching the screenshot */}
@@ -255,11 +234,6 @@ export default function App() {
         isOpen={isAiAssistantOpen}
         onClose={() => setIsAiAssistantOpen(false)}
         initialPrompt={aiAssistantPrompt}
-        reports={reports}
-        onOpenReport={(repId) => {
-          const found = reports.find((r) => r.id === repId);
-          if (found) setSelectedReportForDetail(found);
-        }}
         autoStartListening={voiceAutoStart}
         onAutoStartConsumed={() => setVoiceAutoStart(false)}
         wakeWordEnabled={wakeWordEnabled}
@@ -272,6 +246,7 @@ export default function App() {
       <NotificationsModal
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
+        onNavigateToReadings={() => setCurrentTab('process-monitor')}
       />
     </div>
   );

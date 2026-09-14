@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { loadAnnModel, predictConsumption, type AnnModel, type ConsumptionPrediction } from '../lib/annModel';
 import { computeEmissions, type EmissionsResult } from '../lib/emissionsFormula';
 import { usePlantInput, type InputSource } from './usePlantInput';
+import type { ProcessValues } from '../data/processUnits';
 
 export interface PlantFigures {
   model: AnnModel | null;
@@ -18,8 +19,12 @@ export interface PlantFigures {
   loading: boolean;
   error: string | null;
   grainInputTpd: number;
-  /** Beer column reflux, once readings have been submitted. */
-  refluxRatio: number | null;
+  /** Beer column reflux, derived from the readings like everything else. */
+  refluxRatio: number;
+  /** Every reading behind the figures, so a screen never needs its own copy. */
+  readings: ProcessValues;
+  /** True once the operator's own readings are driving these figures. */
+  hasSubmitted: boolean;
   /** Where the throughput came from, so a screen can cite it. */
   source: InputSource;
   updatedAt: string | null;
@@ -30,7 +35,8 @@ export interface PlantFigures {
 }
 
 export function usePlantFigures(): PlantFigures {
-  const { grainInputTpd, refluxRatio, source, updatedAt, isExtrapolating } = usePlantInput();
+  const { grainInputTpd, refluxRatio, readings, hasSubmitted, source, updatedAt, isExtrapolating } =
+    usePlantInput();
   const [model, setModel] = useState<AnnModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,6 +74,8 @@ export function usePlantFigures(): PlantFigures {
     error,
     grainInputTpd,
     refluxRatio,
+    readings,
+    hasSubmitted,
     source,
     updatedAt,
     isExtrapolating,

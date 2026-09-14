@@ -15,6 +15,7 @@ import {
   classifyScenarios,
   computeSavings,
   grainToEthanolProduction,
+  resolveCurrentScenario,
 } from './distillationEngine';
 
 const evaluateAll = (tpd: number = SCENARIO_ANCHOR_TPD) =>
@@ -165,5 +166,39 @@ describe('computeSavings', () => {
 describe('grainToEthanolProduction', () => {
   it('matches the 390 L per tonne basis used elsewhere', () => {
     expect(grainToEthanolProduction(147.4)).toBeCloseTo(57.486, 3);
+  });
+});
+
+describe('resolveCurrentScenario', () => {
+  const scenarios = classifyScenarios(
+    DISTILLATION_SCENARIOS.map((s) => evaluateScenario(s, 147.4))
+  );
+
+  it('falls back to the nominal scenario when nothing has been submitted', () => {
+    expect(resolveCurrentScenario(scenarios, null).id).toBe(CURRENT_OPERATION_SCENARIO_ID);
+  });
+
+  it('picks the scenario nearest the submitted reflux', () => {
+    // The regression this guards: AI Optimization pinned "current" to S4 while
+    // Carbon resolved it by nearest reflux, so submitting 2.30 produced two
+    // screens that disagreed about the same reading.
+    expect(resolveCurrentScenario(scenarios, 2.3).id).toBe('S1');
+    expect(resolveCurrentScenario(scenarios, 2.5).id).toBe('S2');
+    expect(resolveCurrentScenario(scenarios, 2.79).id).toBe('S3');
+    expect(resolveCurrentScenario(scenarios, 3.1).id).toBe('S4');
+  });
+
+  it('resolves a reading between two anchors to the closer one', () => {
+    expect(resolveCurrentScenario(scenarios, 2.39).id).toBe('S1');
+    expect(resolveCurrentScenario(scenarios, 2.41).id).toBe('S2');
+  });
+
+  it('resolves a reading outside the anchor range to the nearest end', () => {
+    expect(resolveCurrentScenario(scenarios, 0.9).id).toBe('S1');
+    expect(resolveCurrentScenario(scenarios, 4.8).id).toBe('S4');
+  });
+
+  it('ignores a non-finite reflux rather than returning undefined', () => {
+    expect(resolveCurrentScenario(scenarios, NaN).id).toBe(CURRENT_OPERATION_SCENARIO_ID);
   });
 });

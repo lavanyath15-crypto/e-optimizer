@@ -15,7 +15,6 @@ import {
   VolumeX,
   Moon
 } from 'lucide-react';
-import { ReportItem } from '../types';
 import { loadAnnModel, AnnModel } from '../lib/annModel';
 import { buildPlantState } from '../lib/plantState';
 import { useVoice } from '../hooks/useVoice';
@@ -32,12 +31,21 @@ interface Message {
   quickActions?: { label: string; action: () => void }[];
 }
 
+/**
+ * `reports` and `onOpenReport` used to be declared here and passed in from App,
+ * but nothing in this component ever read either one: the assistant's entire
+ * context is buildPlantState(), which carries no report history. They were props
+ * that looked like a feature from the call site and did nothing.
+ *
+ * They are not wired up instead of removed because a report is a snapshot of the
+ * same figures the assistant already reads live, so it would add tokens to every
+ * turn for no new information, and most of the list is seeded sample reports that
+ * the model would then cite as if they were this plant's history.
+ */
 interface AiAssistantModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialPrompt?: string;
-  reports: ReportItem[];
-  onOpenReport?: (reportId: string) => void;
   /** Set when the wake word opened this, so the mic starts without a click. */
   autoStartListening?: boolean;
   onAutoStartConsumed?: () => void;
@@ -51,8 +59,6 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   isOpen,
   onClose,
   initialPrompt,
-  reports,
-  onOpenReport,
   autoStartListening = false,
   onAutoStartConsumed,
   wakeWordEnabled = false,

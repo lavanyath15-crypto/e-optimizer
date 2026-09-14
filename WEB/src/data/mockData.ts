@@ -1,4 +1,4 @@
-import { ReportItem, PlantAlarm, AiOptimizationSetpoint } from '../types';
+import { ReportItem, AiOptimizationSetpoint } from '../types';
 
 export const ASSETS = {
   operatorAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCHiO0Bs6ZfUtTNof6unWjxT6MC9ztJbixQxsLt4aKV9-j1r12v2Or7yn07BGlQ0nC97iwZtj6_am0e3Age6K9BmnBPho9sIJhHWHiFoEus85dJ_vQXleiZ9P7hDFLHWvrsKfKFmrmQr7LUOSs-Q0f-NTZWtDyQdpWkgYnQlgictv5bSsQHT1BltB35Thd0Y3KP62bVAdjW5k65L8nndOcHAQxsTMvl4CwRKz4GOBmZUIDLukFES5g',
@@ -256,44 +256,10 @@ export const INITIAL_REPORTS: ReportItem[] = [
   }
 ];
 
-export const PLANT_ALARMS: PlantAlarm[] = [
-  {
-    id: 'alm-01',
-    severity: 'warning',
-    title: 'Centrifuge CF-202 Vibration Warning',
-    location: 'Separation / Centrifuge Bay #2',
-    timestamp: '14 mins ago',
-    acknowledged: false,
-    metric: 'Vibration RMS',
-    currentValue: '0.38 in/s',
-    threshold: '0.30 in/s',
-    recommendation: 'Check drive-end bearing lubrication; schedule vibration spectral probe inspection.'
-  },
-  {
-    id: 'alm-02',
-    severity: 'critical',
-    title: 'Beer Well Sensor 4 Signal Loss',
-    location: 'Distillation Feed Tank TK-201',
-    timestamp: '42 mins ago',
-    acknowledged: true,
-    metric: 'Loop Current',
-    currentValue: '0.0 mA',
-    threshold: '4.0 - 20.0 mA',
-    recommendation: 'Inspect fuse on analog input rack 2; verify 24VDC loop power supply.'
-  },
-  {
-    id: 'alm-03',
-    severity: 'info',
-    title: 'Peak Grid Tariff Window Commencing',
-    location: 'Utility Incomer & Substation',
-    timestamp: '1 hour ago',
-    acknowledged: true,
-    metric: 'Grid Tariff Rate',
-    currentValue: '$0.185 / kWh',
-    threshold: '$0.090 / kWh',
-    recommendation: 'Automated peak shaving engaged. Co-generation turbine supplying 68% of plant load.'
-  }
-];
+// PLANT_ALARMS lived here: three invented alarms (a centrifuge bearing, a beer
+// well sensor, a grid tariff window) that Overview and the bell popover both
+// listed and that no reading could ever change. Alarms are now derived from the
+// operator's own out-of-band readings in lib/plantAlarms.ts.
 
 // Illustrative setpoints for levers the app does not model. Reflux is
 // deliberately NOT in this list: lib/distillationEngine.ts is the single source

@@ -1,21 +1,21 @@
 import React, { useMemo, useState } from 'react';
-import { AI_SETPOINTS } from '../data/mockData';
-import { AiOptimizationSetpoint } from '../types';
+import { AI_SETPOINTS } from '../../data/mockData';
+import { AiOptimizationSetpoint } from '../../types';
 import { BrainCircuit, CheckCircle2, Sparkles, Sliders, ArrowRight, RotateCcw, AlertTriangle } from 'lucide-react';
 import {
   DISTILLATION_SCENARIOS,
-  CURRENT_OPERATION_SCENARIO_ID,
   PURITY_MIN_PCT,
   RECOVERY_MIN_PCT,
   evaluateScenario,
   classifyScenarios,
   computeSavings,
-} from '../lib/distillationEngine';
+  resolveCurrentScenario,
+} from '../../lib/distillationEngine';
 import { PlantAdvisorCard } from './PlantAdvisorCard';
-import { usePlantInput } from '../hooks/usePlantInput';
+import { usePlantInput } from '../../hooks/usePlantInput';
 
-export const AiOptimizationView: React.FC = () => {
-  const { grainInputTpd } = usePlantInput();
+export const AiOptimizationSection: React.FC = () => {
+  const { grainInputTpd, refluxRatio, hasSubmitted } = usePlantInput();
   const [setpoints, setSetpoints] = useState<AiOptimizationSetpoint[]>(AI_SETPOINTS);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -23,16 +23,19 @@ export const AiOptimizationView: React.FC = () => {
     setSetpoints((prev) =>
       prev.map((sp) => (sp.id === id ? { ...sp, status: 'applied' } : sp))
     );
-    setFeedback(`Setpoint command transmitted to Emerson DeltaV DCS controller.`);
-    setTimeout(() => setFeedback(null), 3000);
+    // Nothing is transmitted anywhere. This claimed "Setpoint command transmitted
+    // to Emerson DeltaV DCS controller", which is a sentence an operator could
+    // reasonably act on. There is no DCS connection in this project.
+    setFeedback('Marked as accepted on this screen only. Nothing was sent to a DCS.');
+    setTimeout(() => setFeedback(null), 4000);
   };
 
   const handleRevert = (id: string) => {
     setSetpoints((prev) =>
       prev.map((sp) => (sp.id === id ? { ...sp, status: 'pending' } : sp))
     );
-    setFeedback(`Restored previous engineering manual setpoint.`);
-    setTimeout(() => setFeedback(null), 3000);
+    setFeedback('Marked as not accepted. Again, nothing left this browser.');
+    setTimeout(() => setFeedback(null), 4000);
   };
 
   // Recomputed whenever the operator changes throughput, so the table describes
@@ -45,9 +48,16 @@ export const AiOptimizationView: React.FC = () => {
     [grainInputTpd]
   );
 
-  const baseline = distillationResults.find((r) => r.id === CURRENT_OPERATION_SCENARIO_ID)!;
+  // The scenario the plant is actually on, from the reflux submitted on Process
+  // Monitor. This was pinned to S4 regardless, so entering 2.30 left this screen
+  // calling S4 "(current)" and pricing savings against it while Carbon, reading
+  // the same number, correctly said S1.
+  const baseline = resolveCurrentScenario(distillationResults, refluxRatio);
   const recommended = distillationResults.find((r) => r.classification === 'Energy_Efficient');
   const savings = recommended ? computeSavings(baseline, recommended) : null;
+  // Negative when the operator is running below the feasible band: cheaper on
+  // steam, and off spec.
+  const costsMore = (savings?.steamSavedKgDay ?? 0) < 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -200,8 +210,10 @@ export const AiOptimizationView: React.FC = () => {
                 >
                   <td className="py-2.5 pr-4 font-bold text-[#061449]">
                     {r.id}
-                    {r.id === CURRENT_OPERATION_SCENARIO_ID && (
-                      <span className="ml-1.5 text-[10px] font-normal text-[#767680]">(current)</span>
+                    {r.id === baseline.id && (
+                      <span className="ml-1.5 text-[10px] font-normal text-[#767680]">
+                        {hasSubmitted ? '(yours)' : '(nominal)'}
+                      </span>
                     )}
                   </td>
                   <td className="py-2.5 pr-4 font-mono">{r.refluxRatio.toFixed(1)}</td>
@@ -241,32 +253,73 @@ export const AiOptimizationView: React.FC = () => {
           </table>
         </div>
 
-        {recommended && savings && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 border-t border-[#e0e3e6]">
-            <div>
-              <span className="text-[11px] text-[#767680] block">Steam Reduction</span>
-              <span className="text-lg font-extrabold font-mono text-[#0f6e8c]">
-                {savings.steamSavedPct.toFixed(1)}%
-              </span>
+        {recommended && savings && recommended.id !== baseline.id && (
+          <div className="space-y-3 pt-2 border-t border-[#e0e3e6]">
+            <p className="text-xs font-bold text-[#061449]">
+              {costsMore
+                ? `Moving from ${baseline.id} up to ${recommended.id}`
+                : `Moving from ${baseline.id} down to ${recommended.id}`}
+            </p>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <span className="text-[11px] text-[#767680] block">
+                  {costsMore ? 'Extra Steam' : 'Steam Reduction'}
+                </span>
+                <span
+                  className={`text-lg font-extrabold font-mono ${
+                    costsMore ? 'text-[#8a6100]' : 'text-[#0f6e8c]'
+                  }`}
+                >
+                  {Math.abs(savings.steamSavedPct).toFixed(1)}%
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-[#767680] block">
+                  {costsMore ? 'Extra Energy' : 'Energy Saved'}
+                </span>
+                <span
+                  className={`text-lg font-extrabold font-mono ${
+                    costsMore ? 'text-[#8a6100]' : 'text-[#0f6e8c]'
+                  }`}
+                >
+                  {Math.abs(savings.energySavedGjDay).toFixed(1)} GJ/day
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-[#767680] block">
+                  {costsMore ? 'Extra CO2e' : 'CO2e Saved'}
+                </span>
+                <span
+                  className={`text-lg font-extrabold font-mono ${
+                    costsMore ? 'text-[#8a6100]' : 'text-[#2D6A4F]'
+                  }`}
+                >
+                  {Math.abs(savings.co2eSavedKgDay).toFixed(0)} kg/day
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-[#767680] block">Annualized CO2e</span>
+                <span
+                  className={`text-lg font-extrabold font-mono ${
+                    costsMore ? 'text-[#8a6100]' : 'text-[#2D6A4F]'
+                  }`}
+                >
+                  {Math.abs(savings.co2eSavedTonnesYear).toFixed(1)} t/yr
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="text-[11px] text-[#767680] block">Energy Saved</span>
-              <span className="text-lg font-extrabold font-mono text-[#0f6e8c]">
-                {savings.energySavedGjDay.toFixed(1)} GJ/day
-              </span>
-            </div>
-            <div>
-              <span className="text-[11px] text-[#767680] block">CO2e Saved</span>
-              <span className="text-lg font-extrabold font-mono text-[#2D6A4F]">
-                {savings.co2eSavedKgDay.toFixed(0)} kg/day
-              </span>
-            </div>
-            <div>
-              <span className="text-[11px] text-[#767680] block">Annualized CO2e</span>
-              <span className="text-lg font-extrabold font-mono text-[#2D6A4F]">
-                {savings.co2eSavedTonnesYear.toFixed(1)} t/yr
-              </span>
-            </div>
+
+            {/* A plant running below the feasible band uses less steam because it
+                is off spec. Reporting that as "Steam Reduction: -4.0%" put a
+                minus sign in front of a saving instead of calling it a cost. */}
+            {costsMore && (
+              <p className="text-xs text-[#8a6100] bg-[#FFB703]/10 border border-[#FFB703]/40 rounded-lg p-3">
+                {baseline.id} uses less steam than {recommended.id}, but it fails the purity or
+                recovery limit. These are the figures for getting back inside the limits, so they
+                are a cost, not a saving.
+              </p>
+            )}
           </div>
         )}
 

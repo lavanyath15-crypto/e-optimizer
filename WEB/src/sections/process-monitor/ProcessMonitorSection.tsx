@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Cpu, Gauge, Droplets, Flame, Wind, Play, Pause, RotateCcw, CheckCircle2, AlertTriangle, Save } from 'lucide-react';
 import {
   PROCESS_UNITS,
@@ -8,12 +8,10 @@ import {
   isInBand,
   clampToField,
   formatValue,
-} from '../data/processUnits';
-import { bushelsPerHourToTonnesPerDay } from '../lib/grainFeed';
-import { usePlantInput } from '../hooks/usePlantInput';
+} from '../../data/processUnits';
+import { bushelsPerHourToTonnesPerDay } from '../../lib/grainFeed';
+import { usePlantInput, TRAINED_MIN_TPD, TRAINED_MAX_TPD } from '../../hooks/usePlantInput';
 import { SubmittedReadingResult } from './SubmittedReadingResult';
-
-const STORAGE_KEY = 'eoptimizer-process-inputs';
 
 const UNIT_ICONS: Record<string, React.ReactNode> = {
   milling: <Gauge className="w-4 h-4 text-[#0f6e8c]" />,
@@ -23,65 +21,35 @@ const UNIT_ICONS: Record<string, React.ReactNode> = {
   drying: <Wind className="w-4 h-4 text-[#767680]" />,
 };
 
-/** Merge saved values over the defaults so a new field never comes back undefined. */
-function loadValues(): ProcessValues {
-  const merged: ProcessValues = {};
-  for (const unit of PROCESS_UNITS) {
-    merged[unit.id] = { ...PROCESS_DEFAULTS[unit.id] };
-  }
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return merged;
-
-    const saved = JSON.parse(raw) as ProcessValues;
-    for (const unit of PROCESS_UNITS) {
-      for (const field of unit.fields) {
-        const value = saved?.[unit.id]?.[field.key];
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          merged[unit.id][field.key] = clampToField(field, value);
-        }
-      }
-    }
-  } catch {
-    // Corrupt or unavailable storage just falls back to the defaults.
-  }
-  return merged;
-}
-
-export const ProcessMonitorView: React.FC = () => {
-  const [selectedUnit, setSelectedUnit] = useState<string>('distillation');
+export const ProcessMonitorSection: React.FC = () => {
+  const [selectedUnit, setSelectedUnit] = useState<string>('milling');
   const [isSimulating, setIsSimulating] = useState<boolean>(true);
-  const [values, setValues] = useState<ProcessValues>(loadValues);
   // Raw text per input so a half-typed value like "1." is not clobbered mid-edit.
+  // This is the only local state left: the readings themselves live in the shared
+  // store, so this screen and every other one are looking at one set of numbers.
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [submittedAt, setSubmittedAt] = useState<string | null>(null);
-  const { applyProcessReadings } = usePlantInput();
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(values));
-    } catch {
-      // Storage can be unavailable in private mode; entered values still work
-      // for this session.
-    }
-  }, [values]);
+  const { readings: values, hasSubmitted, updatedAt, applyProcessReadings } = usePlantInput();
 
   const unit = PROCESS_UNITS.find((u) => u.id === selectedUnit)!;
 
+  /**
+   * Publishes a single field.
+   *
+   * Committing straight to the shared store is deliberate. The previous version
+   * kept a private copy of the readings in this component and only published on
+   * Submit, which meant the cards on this screen could show one set of values
+   * while Carbon, Analytics and Overview ran on another.
+   */
   const commit = (unitId: string, field: ProcessField, raw: string) => {
     const parsed = parseFloat(raw);
-    setValues((prev) => ({
-      ...prev,
-      [unitId]: {
-        ...prev[unitId],
-        // Clearing the box or typing junk restores the previous reading rather
-        // than silently writing the field minimum.
-        [field.key]: Number.isNaN(parsed)
-          ? prev[unitId][field.key]
-          : clampToField(field, parsed),
-      },
-    }));
+    // Clearing the box or typing junk restores the previous reading rather than
+    // silently writing the field minimum.
+    if (!Number.isNaN(parsed)) {
+      applyProcessReadings({
+        [unitId]: { ...values[unitId], [field.key]: clampToField(field, parsed) },
+      });
+    }
+
     setDrafts((prev) => {
       const next = { ...prev };
       delete next[`${unitId}.${field.key}`];
@@ -90,9 +58,8 @@ export const ProcessMonitorView: React.FC = () => {
   };
 
   const resetUnit = (unitId: string) => {
-    setValues((prev) => ({ ...prev, [unitId]: { ...PROCESS_DEFAULTS[unitId] } }));
+    applyProcessReadings({ [unitId]: { ...PROCESS_DEFAULTS[unitId] } });
     setDrafts({});
-    setSubmittedAt(null);
   };
 
   /**
@@ -103,62 +70,25 @@ export const ProcessMonitorView: React.FC = () => {
    * the behaviour the button implies.
    */
   const submitReadings = () => {
-    setValues((prev) => {
-      const next: ProcessValues = { ...prev };
+    const next: ProcessValues = {};
 
-      for (const u of PROCESS_UNITS) {
-        for (const field of u.fields) {
-          const raw = drafts[`${u.id}.${field.key}`];
-          if (raw === undefined) continue;
-
-          const parsed = parseFloat(raw);
-          // Same rule as commit(): junk keeps the previous reading rather than
-          // silently writing the field minimum.
-          if (Number.isNaN(parsed)) continue;
-
-          next[u.id] = { ...next[u.id], [field.key]: clampToField(field, parsed) };
-        }
-      }
-
-      return next;
-    });
-
-    setDrafts({});
-    setSubmittedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-
-    // Push the readings that other screens can actually use. Drafts are read
-    // directly because the setValues above has not flushed yet at this point.
-    const readingOf = (unitId: string, fieldKey: string): number => {
-      const unit = PROCESS_UNITS.find((u) => u.id === unitId)!;
-      const field = unit.fields.find((f) => f.key === fieldKey)!;
-      const draft = drafts[`${unitId}.${fieldKey}`];
-
-      if (draft !== undefined) {
-        const parsed = parseFloat(draft);
-        if (!Number.isNaN(parsed)) return clampToField(field, parsed);
-      }
-      return values[unitId][fieldKey];
-    };
-
-    // Snapshot of every field as submitted, drafts included, so other screens
-    // show what the operator entered rather than sample values.
-    const submitted: ProcessValues = {};
     for (const u of PROCESS_UNITS) {
-      submitted[u.id] = {};
+      next[u.id] = { ...values[u.id] };
       for (const field of u.fields) {
-        submitted[u.id][field.key] = readingOf(u.id, field.key);
+        const raw = drafts[`${u.id}.${field.key}`];
+        if (raw === undefined) continue;
+
+        const parsed = parseFloat(raw);
+        // Same rule as commit(): junk keeps the previous reading rather than
+        // silently writing the field minimum.
+        if (Number.isNaN(parsed)) continue;
+
+        next[u.id][field.key] = clampToField(field, parsed);
       }
     }
 
-    applyProcessReadings({
-      // Bushels per hour off the mill scale is what an operator reads; tonnes
-      // per day is what the network takes.
-      grainInputTpd: bushelsPerHourToTonnesPerDay(readingOf('milling', 'feedRate')),
-      // Not a model input, but it places the plant against the screened
-      // scenarios on the Carbon and AI Optimization screens.
-      refluxRatio: readingOf('distillation', 'refluxRatio'),
-      readings: submitted,
-    });
+    setDrafts({});
+    applyProcessReadings(next);
   };
 
   const pendingCount = Object.keys(drafts).length;
@@ -302,6 +232,24 @@ export const ProcessMonitorView: React.FC = () => {
               const inBand = isInBand(field, value);
               const inputId = `input-${draftKey}`;
 
+              // Grain feed rate is the only reading that drives a prediction, and
+              // it is entered in bushels per hour while every other screen reports
+              // tonnes per day. Without this an operator aiming for 140 t/day has
+              // no way to see that the untouched 242 bu/hr default means 147.5,
+              // and no way to tell which box on this screen even matters.
+              const isGrainFeed = unit.id === 'milling' && field.key === 'feedRate';
+              let derivedTpd: number | null = null;
+              if (isGrainFeed) {
+                const draft = drafts[draftKey];
+                const parsed = draft === undefined ? NaN : parseFloat(draft);
+                derivedTpd = bushelsPerHourToTonnesPerDay(
+                  Number.isNaN(parsed) ? value : clampToField(field, parsed)
+                );
+              }
+              const tpdOutsideTraining =
+                derivedTpd !== null &&
+                (derivedTpd < TRAINED_MIN_TPD || derivedTpd > TRAINED_MAX_TPD);
+
               return (
                 <div
                   key={field.key}
@@ -322,7 +270,7 @@ export const ProcessMonitorView: React.FC = () => {
                       min={field.min}
                       max={field.max}
                       step={field.step}
-                      value={drafts[draftKey] ?? String(value)}
+                      value={drafts[draftKey] ?? value.toFixed(field.decimals)}
                       onChange={(e) =>
                         setDrafts((prev) => ({ ...prev, [draftKey]: e.target.value }))
                       }
@@ -353,6 +301,24 @@ export const ProcessMonitorView: React.FC = () => {
                     {formatValue(field, field.normalMax)}
                     {field.unit && ` ${field.unit}`})
                   </p>
+
+                  {derivedTpd !== null && (
+                    <p
+                      className={`text-[11px] pt-1 border-t border-[#e0e3e6] ${
+                        tpdOutsideTraining ? 'text-[#8a6100]' : 'text-[#0f6e8c]'
+                      }`}
+                    >
+                      <span className="font-bold font-mono">
+                        = {derivedTpd.toFixed(1)} t/day
+                      </span>
+                      <span className="block text-[#767680]">
+                        This is the figure every other screen runs on.{' '}
+                        {tpdOutsideTraining
+                          ? `Outside the ${TRAINED_MIN_TPD}-${TRAINED_MAX_TPD} t/day the model was trained on.`
+                          : `Model trained on ${TRAINED_MIN_TPD}-${TRAINED_MAX_TPD} t/day.`}
+                      </span>
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -367,14 +333,16 @@ export const ProcessMonitorView: React.FC = () => {
                     {pendingCount} unsaved {pendingCount === 1 ? 'edit' : 'edits'}
                   </span>
                 </span>
-              ) : submittedAt ? (
+              ) : hasSubmitted ? (
                 <span className="text-[#2D6A4F] font-semibold flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  <span>Readings saved to this browser at {submittedAt}</span>
+                  <span>
+                    Live on every screen{updatedAt ? `, last change ${updatedAt}` : ''}
+                  </span>
                 </span>
               ) : (
                 <span className="text-[#767680]">
-                  Readings save as you go. Submit applies anything still being typed.
+                  Readings publish as you leave each box. Submit applies anything still being typed.
                 </span>
               )}
             </div>
@@ -398,9 +366,11 @@ export const ProcessMonitorView: React.FC = () => {
         </div>
       </div>
 
-      {submittedAt && (
-        <SubmittedReadingResult enteredRefluxRatio={values.distillation.refluxRatio} />
-      )}
+      {/* Shown from the moment the operator's own readings are in play, and it
+          stays shown when they come back to this tab. It used to hang off a
+          local submittedAt that reset on every tab switch, so the result of the
+          readings disappeared as soon as you went to look at anything else. */}
+      {hasSubmitted && <SubmittedReadingResult enteredRefluxRatio={values.distillation.refluxRatio} />}
     </div>
   );
 };

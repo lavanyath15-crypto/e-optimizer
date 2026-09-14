@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ReportItem } from '../types';
+import { ReportItem } from '../../types';
 import {
   X,
   Download,

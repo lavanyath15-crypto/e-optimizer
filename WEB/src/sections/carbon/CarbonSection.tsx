@@ -1,20 +1,21 @@
 import React from 'react';
 import { Leaf, Award, ShieldCheck, AlertTriangle, ArrowUpRight } from 'lucide-react';
-import { usePlantFigures } from '../hooks/usePlantFigures';
+import { usePlantFigures } from '../../hooks/usePlantFigures';
 import {
   ELECTRICITY_KG_CO2E_PER_KWH,
   DISTILLATION_STEAM_KG_CO2E_PER_KG,
   DRYER_FUEL_KG_CO2E_PER_MMBTU,
-} from '../lib/emissionsFormula';
+} from '../../lib/emissionsFormula';
 import {
   DISTILLATION_SCENARIOS,
   classifyScenarios,
   evaluateScenario,
-} from '../lib/distillationEngine';
-import { ReadingSourceBar } from './ReadingSourceBar';
-import { TabType } from '../types';
+  resolveCurrentScenario,
+} from '../../lib/distillationEngine';
+import { ReadingSourceBar } from '../../components/ReadingSourceBar';
+import { TabType } from '../../types';
 
-interface CarbonEmissionsViewProps {
+interface CarbonSectionProps {
   onNavigateTab?: (tab: TabType) => void;
 }
 
@@ -33,24 +34,35 @@ interface CarbonEmissionsViewProps {
  * What is shown instead is what the pipeline genuinely produces: operational
  * CO2e in its own units, split by the three sources it is recovered from.
  */
-export const CarbonEmissionsView: React.FC<CarbonEmissionsViewProps> = ({ onNavigateTab }) => {
-  const { emissions, consumption, loading, error, grainInputTpd, refluxRatio, source, updatedAt } =
-    usePlantFigures();
+export const CarbonSection: React.FC<CarbonSectionProps> = ({ onNavigateTab }) => {
+  const {
+    emissions,
+    consumption,
+    loading,
+    error,
+    grainInputTpd,
+    refluxRatio,
+    hasSubmitted,
+    source,
+    updatedAt,
+  } = usePlantFigures();
 
   // Where the submitted reflux sits against the screened scenarios, and what the
-  // recommended point would save. Only shown once readings have been submitted.
+  // recommended point would save. resolveCurrentScenario is shared with AI
+  // Optimization so the two screens cannot disagree about which scenario the
+  // plant is on.
   const scenarios = classifyScenarios(
     DISTILLATION_SCENARIOS.map((s) => evaluateScenario(s, grainInputTpd))
   );
   const recommended = scenarios.find((s) => s.classification === 'Energy_Efficient');
-  const current =
-    refluxRatio === null
-      ? null
-      : scenarios.reduce((best, s) =>
-          Math.abs(s.refluxRatio - refluxRatio) < Math.abs(best.refluxRatio - refluxRatio)
-            ? s
-            : best
-        );
+  const current = hasSubmitted ? resolveCurrentScenario(scenarios, refluxRatio) : null;
+
+  // Positive means the recommended point uses less steam than the plant is using
+  // now. It goes negative whenever the operator is running below the feasible
+  // band, which is cheaper on steam precisely because it is off spec.
+  const steamDeltaKgDay = current && recommended ? current.steamKgDay - recommended.steamKgDay : 0;
+  const co2eDeltaKgDay = current && recommended ? current.co2eKgDay - recommended.co2eKgDay : 0;
+  const costsMore = steamDeltaKgDay < 0;
 
   const sources =
     emissions && consumption
@@ -187,9 +199,13 @@ export const CarbonEmissionsView: React.FC<CarbonEmissionsViewProps> = ({ onNavi
               </div>
               {onNavigateTab && (
                 <button
-                  onClick={() => onNavigateTab('ai-optimization')}
+                  onClick={() => onNavigateTab('process-monitor')}
                   className="text-xs font-bold text-[#0f6e8c] hover:text-[#0b5670] flex items-center gap-1 cursor-pointer shrink-0"
                 >
+                  {/* Process Monitor, not AI Optimization. Throughput is the
+                      milling feed rate; sending the operator to the advisory
+                      slider was pointing them at the second way to set the same
+                      thing. */}
                   <span>Change throughput</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </button>
@@ -245,7 +261,7 @@ export const CarbonEmissionsView: React.FC<CarbonEmissionsViewProps> = ({ onNavi
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="text-[#45464f]">
                   You entered{' '}
-                  <strong className="font-mono">{refluxRatio?.toFixed(2)}</strong>, closest to{' '}
+                  <strong className="font-mono">{refluxRatio.toFixed(2)}</strong>, closest to{' '}
                   <strong>{current.id}</strong> at{' '}
                   <strong className="font-mono">{current.refluxRatio.toFixed(2)}</strong>
                 </span>
@@ -267,35 +283,61 @@ export const CarbonEmissionsView: React.FC<CarbonEmissionsViewProps> = ({ onNavi
               </div>
 
               {recommended && current.id !== recommended.id && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                  <div className="bg-[#f7f9fc] p-3.5 rounded-lg border border-[#e0e3e6]">
-                    <span className="text-[11px] text-[#767680] block">Move to</span>
-                    <span className="text-lg font-bold font-mono text-[#0f6e8c]">
-                      {recommended.id}
-                    </span>
-                    <span className="text-[11px] text-[#767680] ml-1">
-                      reflux {recommended.refluxRatio.toFixed(2)}
-                    </span>
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-1">
+                    <div className="bg-[#f7f9fc] p-3.5 rounded-lg border border-[#e0e3e6]">
+                      <span className="text-[11px] text-[#767680] block">Move to</span>
+                      <span className="text-lg font-bold font-mono text-[#0f6e8c]">
+                        {recommended.id}
+                      </span>
+                      <span className="text-[11px] text-[#767680] ml-1">
+                        reflux {recommended.refluxRatio.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="bg-[#f7f9fc] p-3.5 rounded-lg border border-[#e0e3e6]">
+                      <span className="text-[11px] text-[#767680] block">
+                        {costsMore ? 'Extra steam' : 'Steam saved'}
+                      </span>
+                      <span
+                        className={`text-lg font-bold font-mono ${
+                          costsMore ? 'text-[#8a6100]' : 'text-[#2D6A4F]'
+                        }`}
+                      >
+                        {Math.abs(steamDeltaKgDay).toLocaleString(undefined, {
+                          maximumFractionDigits: 0,
+                        })}
+                      </span>
+                      <span className="text-[11px] text-[#767680] ml-1">kg/day</span>
+                    </div>
+                    <div className="bg-[#f7f9fc] p-3.5 rounded-lg border border-[#e0e3e6]">
+                      <span className="text-[11px] text-[#767680] block">
+                        {costsMore ? 'Extra CO2e' : 'CO2e saved'}
+                      </span>
+                      <span
+                        className={`text-lg font-bold font-mono ${
+                          costsMore ? 'text-[#8a6100]' : 'text-[#2D6A4F]'
+                        }`}
+                      >
+                        {Math.abs(co2eDeltaKgDay).toLocaleString(undefined, {
+                          maximumFractionDigits: 0,
+                        })}
+                      </span>
+                      <span className="text-[11px] text-[#767680] ml-1">kg/day</span>
+                    </div>
                   </div>
-                  <div className="bg-[#f7f9fc] p-3.5 rounded-lg border border-[#e0e3e6]">
-                    <span className="text-[11px] text-[#767680] block">Steam saved</span>
-                    <span className="text-lg font-bold font-mono text-[#2D6A4F]">
-                      {(current.steamKgDay - recommended.steamKgDay).toLocaleString(undefined, {
-                        maximumFractionDigits: 0,
-                      })}
-                    </span>
-                    <span className="text-[11px] text-[#767680] ml-1">kg/day</span>
-                  </div>
-                  <div className="bg-[#f7f9fc] p-3.5 rounded-lg border border-[#e0e3e6]">
-                    <span className="text-[11px] text-[#767680] block">CO2e saved</span>
-                    <span className="text-lg font-bold font-mono text-[#2D6A4F]">
-                      {(current.co2eKgDay - recommended.co2eKgDay).toLocaleString(undefined, {
-                        maximumFractionDigits: 0,
-                      })}
-                    </span>
-                    <span className="text-[11px] text-[#767680] ml-1">kg/day</span>
-                  </div>
-                </div>
+
+                  {/* Running below the feasible band is cheaper on steam and off
+                      spec, so the move to the recommended point costs energy
+                      rather than saving it. Printing "Steam saved: -2,854" was
+                      technically the same number and the wrong sentence. */}
+                  {costsMore && (
+                    <p className="text-xs text-[#8a6100] bg-[#FFB703]/10 border border-[#FFB703]/40 rounded-lg p-3">
+                      You are running below {recommended.id}, which uses less steam but does not meet
+                      the purity and recovery limits. Getting back inside them costs energy, it does
+                      not save it. The figures above are what that costs.
+                    </p>
+                  )}
+                </>
               )}
 
               <p className="text-[10px] text-[#767680] pt-2 border-t border-[#e0e3e6]">

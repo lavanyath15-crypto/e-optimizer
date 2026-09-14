@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Sparkles, Bot, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
-import { usePlantFigures } from '../hooks/usePlantFigures';
-import { buildPlantState } from '../lib/plantState';
+import { usePlantFigures } from '../../hooks/usePlantFigures';
+import { buildPlantState } from '../../lib/plantState';
 import { getRecommendations } from '@backend/recommend.js';
 import { DatasetAnalysisCard } from './DatasetAnalysisCard';
-import { TabType } from '../types';
+import { TabType } from '../../types';
 
-interface RecommendationsViewProps {
+interface RecommendationsSectionProps {
   onNavigateTab?: (tab: TabType) => void;
 }
 
@@ -19,7 +19,7 @@ interface RecommendationsViewProps {
  * does: model output and screened scenarios go to the LLM, which is told to use
  * only the numbers it is given.
  */
-export const RecommendationsView: React.FC<RecommendationsViewProps> = ({ onNavigateTab }) => {
+export const RecommendationsSection: React.FC<RecommendationsSectionProps> = ({ onNavigateTab }) => {
   const { model, loading, error, grainInputTpd } = usePlantFigures();
 
   const [advice, setAdvice] = useState<string | null>(null);

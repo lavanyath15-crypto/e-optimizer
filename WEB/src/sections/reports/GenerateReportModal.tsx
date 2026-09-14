@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { ReportCategory, ReportItem } from '../types';
-import { ASSETS } from '../data/mockData';
-import { usePlantFigures } from '../hooks/usePlantFigures';
-import { describeSource } from '../hooks/usePlantInput';
+import { ReportCategory, ReportItem } from '../../types';
+import { ASSETS } from '../../data/mockData';
+import { usePlantFigures } from '../../hooks/usePlantFigures';
+import { describeSource } from '../../hooks/usePlantInput';
 import {
   DISTILLATION_SCENARIOS,
   classifyScenarios,
   evaluateScenario,
-} from '../lib/distillationEngine';
+} from '../../lib/distillationEngine';
 import { X, Calendar, FileText, Sparkles, ChevronDown, CheckCircle2 } from 'lucide-react';
 
 interface GenerateReportModalProps {

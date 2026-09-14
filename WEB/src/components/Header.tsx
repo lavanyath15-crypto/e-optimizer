@@ -25,7 +25,9 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleMobileMenu,
   onOpenNotifications,
   onOpenSettings,
-  unreadAlertsCount = 2,
+  // Zero, not two. A default of 2 meant a caller that forgot to pass the real
+  // count still painted an alert dot on the bell.
+  unreadAlertsCount = 0,
   onQuickRefresh,
   isRefreshing = false,
   wakeWordSupported = false,
@@ -140,11 +142,17 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onOpenNotifications}
           className="relative p-2 text-[#45464f] hover:text-[#061449] hover:bg-[#eceef1] rounded-lg transition-colors cursor-pointer"
-          title="Notifications & Alarms"
+          title={
+            unreadAlertsCount > 0
+              ? `${unreadAlertsCount} reading${unreadAlertsCount === 1 ? '' : 's'} outside band`
+              : 'Every reading is inside its band'
+          }
         >
           <Bell className="w-5 h-5" />
           {unreadAlertsCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#ba1a1a] rounded-full border-2 border-white"></span>
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold text-white bg-[#ba1a1a] rounded-full border-2 border-white">
+              {unreadAlertsCount}
+            </span>
           )}
         </button>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bot, Loader2, AlertTriangle, Sparkles } from 'lucide-react';
-import { loadAnnModel, predictConsumption, AnnModel } from '../lib/annModel';
+import { loadAnnModel, predictConsumption, AnnModel } from '../../lib/annModel';
 import {
   computeEmissions,
   ethanolProductionKl,
@@ -8,17 +8,17 @@ import {
   ELECTRICITY_KG_CO2E_PER_KWH,
   DISTILLATION_STEAM_KG_CO2E_PER_KG,
   DRYER_FUEL_KG_CO2E_PER_MMBTU,
-} from '../lib/emissionsFormula';
+} from '../../lib/emissionsFormula';
 import { getRecommendations } from '@backend/recommend.js';
 import type { DistillationScenarioPayload } from '@backend/recommend.js';
-import { DistillationScenarioResult } from '../lib/distillationEngine';
+import { DistillationScenarioResult } from '../../lib/distillationEngine';
 import {
   usePlantInput,
   TRAINED_MIN_TPD,
   TRAINED_MAX_TPD,
   GRAIN_INPUT_MIN_TPD,
   GRAIN_INPUT_MAX_TPD,
-} from '../hooks/usePlantInput';
+} from '../../hooks/usePlantInput';
 
 interface PlantAdvisorCardProps {
   scenarios: DistillationScenarioResult[];
@@ -127,6 +127,10 @@ export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
           <label htmlFor="advisor-grain" className="text-[11px] text-[#767680] block font-medium">
             Grain Input
           </label>
+          {/* Rounded for display. Throughput is derived from the milling feed
+              rate now rather than stored alongside it, so the raw figure carries
+              the full float tail: 140.2144734144. Typing here writes back into
+              that feed rate, which is why Process Monitor follows this box. */}
           <div className="flex items-center gap-2">
             <input
               id="advisor-grain"
@@ -135,7 +139,7 @@ export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
               min={GRAIN_INPUT_MIN_TPD}
               max={GRAIN_INPUT_MAX_TPD}
               step={0.1}
-              value={draft ?? String(grainInput)}
+              value={draft ?? grainInput.toFixed(1)}
               onChange={(e) => setDraft(e.target.value)}
               onBlur={(e) => commitGrainInput(e.target.value)}
               onKeyDown={(e) => {

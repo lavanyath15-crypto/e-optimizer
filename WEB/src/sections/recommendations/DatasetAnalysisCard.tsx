@@ -9,8 +9,8 @@ import {
   ShieldCheck,
   RefreshCw,
 } from 'lucide-react';
-import { usePlantFigures } from '../hooks/usePlantFigures';
-import { buildPlantState } from '../lib/plantState';
+import { usePlantFigures } from '../../hooks/usePlantFigures';
+import { buildPlantState } from '../../lib/plantState';
 import {
   DATASET_LIMITS,
   DatasetError,
@@ -18,7 +18,7 @@ import {
   parseDataset,
   summaryForPrompt,
   type DatasetSummary,
-} from '../lib/datasetAnalysis';
+} from '../../lib/datasetAnalysis';
 import { analyseDataset as askModel } from '@backend/recommend.js';
 
 /**

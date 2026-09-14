@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ReportItem, ReportCategory } from '../types';
+import { ReportItem, ReportCategory } from '../../types';
 import { PlusCircle, Eye, Download, Check, Loader2, RefreshCw, AlertTriangle, Filter, Sparkles } from 'lucide-react';
 
-interface ReportsViewProps {
+interface ReportsSectionProps {
   reports: ReportItem[];
   searchQuery: string;
   onOpenGenerateModal: () => void;
@@ -12,7 +12,7 @@ interface ReportsViewProps {
   onOpenAiAssistantWithPrompt?: (prompt: string) => void;
 }
 
-export const ReportsView: React.FC<ReportsViewProps> = ({
+export const ReportsSection: React.FC<ReportsSectionProps> = ({
   reports,
   searchQuery,
   onOpenGenerateModal,

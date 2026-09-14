@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Bot, Loader2, AlertTriangle, Sparkles, RefreshCw, ArrowRight } from 'lucide-react';
-import { usePlantFigures } from '../hooks/usePlantFigures';
-import { buildPlantState } from '../lib/plantState';
+import { usePlantFigures } from '../../hooks/usePlantFigures';
+import { buildPlantState } from '../../lib/plantState';
 import {
   DISTILLATION_SCENARIOS,
   classifyScenarios,
   evaluateScenario,
-} from '../lib/distillationEngine';
+} from '../../lib/distillationEngine';
 import { getRecommendations } from '@backend/recommend.js';
 
 interface SubmittedReadingResultProps {

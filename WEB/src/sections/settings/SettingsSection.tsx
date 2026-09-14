@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { Settings, HelpCircle, Shield, Sliders, Database, Server, CheckCircle2, LogOut } from 'lucide-react';
 import { signOut } from '@backend/auth.js';
-import { IllustrativeDataBanner } from './IllustrativeDataBanner';
+import { IllustrativeDataBanner } from '../../components/IllustrativeDataBanner';
 
 const SLIDING_PAGE_URL = '/';
 
-interface SettingsSupportViewProps {
+interface SettingsSectionProps {
   initialTab?: 'settings' | 'support';
 }
 
-export const SettingsSupportView: React.FC<SettingsSupportViewProps> = ({
+export const SettingsSection: React.FC<SettingsSectionProps> = ({
   initialTab = 'settings'
 }) => {
   const [activeTab, setActiveTab] = useState<'settings' | 'support'>(initialTab);

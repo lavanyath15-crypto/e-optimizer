@@ -1,32 +1,35 @@
 import React from 'react';
-import { PLANT_ALARMS, INITIAL_REPORTS } from '../data/mockData';
-import { TabType, ReportItem } from '../types';
-import { usePlantFigures } from '../hooks/usePlantFigures';
-import { buildPlantMetrics, formatMetricValue, isWeak } from '../lib/plantMetrics';
-import { ReadingSourceBar } from './ReadingSourceBar';
-import { usePlantInput } from '../hooks/usePlantInput';
-import {
-  PROCESS_UNITS,
-  PROCESS_DEFAULTS,
-  isInBand,
-  formatValue,
-} from '../data/processUnits';
+import { TabType, ReportItem } from '../../types';
+import { deriveAlarms } from '../../lib/plantAlarms';
+import { usePlantFigures } from '../../hooks/usePlantFigures';
+import { buildPlantMetrics, formatMetricValue, isWeak } from '../../lib/plantMetrics';
+import { ReadingSourceBar } from '../../components/ReadingSourceBar';
+import { usePlantInput } from '../../hooks/usePlantInput';
+import { PROCESS_UNITS, isInBand, formatValue } from '../../data/processUnits';
 import { AlertTriangle, FileText, Sparkles, ArrowUpRight } from 'lucide-react';
 
-interface OverviewViewProps {
+interface OverviewSectionProps {
   onNavigateTab: (tab: TabType) => void;
   onViewReport: (report: ReportItem) => void;
   onOpenAiAssistant: () => void;
+  /**
+   * The live list App holds, newest first. This widget used to import
+   * INITIAL_REPORTS directly, so it showed the same two seeded samples forever
+   * and a report the operator had just generated never appeared here.
+   */
+  reports: ReportItem[];
 }
 
-export const OverviewView: React.FC<OverviewViewProps> = ({
+export const OverviewSection: React.FC<OverviewSectionProps> = ({
   onNavigateTab,
   onViewReport,
-  onOpenAiAssistant
+  onOpenAiAssistant,
+  reports
 }) => {
   const { model, consumption, emissions, loading, error, grainInputTpd, source, updatedAt } =
     usePlantFigures();
   const { readings } = usePlantInput();
+  const alarms = deriveAlarms(readings);
   const metrics =
     model && consumption && emissions ? buildPlantMetrics(consumption, emissions, model) : [];
 
@@ -155,7 +158,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               screens away. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {PROCESS_UNITS.map((unit) => {
-              const unitValues = readings?.[unit.id] ?? PROCESS_DEFAULTS[unit.id];
+              const unitValues = readings[unit.id];
               const outOfBand = unit.fields.filter((f) => !isInBand(f, unitValues[f.key]));
 
               return (
@@ -217,31 +220,56 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div className="bg-white rounded-xl p-5 border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#061449] flex items-center gap-1.5">
-                <AlertTriangle className="w-4 h-4 text-[#ba1a1a]" />
-                <span>Priority Plant Alarms</span>
+                <AlertTriangle
+                  className={`w-4 h-4 ${alarms.length ? 'text-[#ba1a1a]' : 'text-[#2D6A4F]'}`}
+                />
+                <span>Readings Outside Band</span>
               </h3>
               <span className="text-xs font-semibold text-[#767680]">
-                {PLANT_ALARMS.length} active
+                {alarms.length} active
               </span>
             </div>
 
+            {/* Raised from the operator's own readings. Three invented alarms
+                used to sit here - a centrifuge bearing, a beer well sensor, a
+                tariff window - none of which could change and none of which had
+                anything to do with what had just been entered. */}
             <div className="space-y-2.5">
-              {PLANT_ALARMS.slice(0, 2).map((alarm) => (
-                <div
-                  key={alarm.id}
-                  className={`p-3 rounded-lg border text-xs space-y-1 ${
-                    alarm.severity === 'critical'
-                      ? 'bg-[#ffdad6]/40 border-[#ba1a1a]/30 text-[#93000a]'
-                      : 'bg-[#FFB703]/10 border-[#FFB703]/30 text-[#8a6100]'
-                  }`}
-                >
-                  <div className="font-bold flex items-center justify-between">
-                    <span>{alarm.title}</span>
-                    <span className="text-[10px] uppercase font-bold">{alarm.severity}</span>
-                  </div>
-                  <p className="text-[11px] opacity-90">{alarm.location}</p>
-                </div>
-              ))}
+              {alarms.length === 0 ? (
+                <p className="text-xs text-[#2D6A4F] py-1">
+                  Every reading is inside its band.
+                </p>
+              ) : (
+                alarms.slice(0, 3).map((alarm) => (
+                  <button
+                    key={alarm.id}
+                    type="button"
+                    onClick={() => onNavigateTab('process-monitor')}
+                    className={`w-full text-left p-3 rounded-lg border text-xs space-y-1 cursor-pointer transition-colors ${
+                      alarm.severity === 'critical'
+                        ? 'bg-[#ffdad6]/40 border-[#ba1a1a]/30 text-[#93000a] hover:bg-[#ffdad6]/60'
+                        : 'bg-[#FFB703]/10 border-[#FFB703]/30 text-[#8a6100] hover:bg-[#FFB703]/20'
+                    }`}
+                  >
+                    <div className="font-bold flex items-center justify-between gap-2">
+                      <span className="truncate">{alarm.title}</span>
+                      <span className="text-[10px] uppercase font-bold shrink-0">
+                        {alarm.severity}
+                      </span>
+                    </div>
+                    <p className="text-[11px] opacity-90 truncate">{alarm.location}</p>
+                    <p className="text-[11px] font-mono">
+                      {alarm.currentValue} &middot; band {alarm.threshold}
+                    </p>
+                  </button>
+                ))
+              )}
+
+              {alarms.length > 3 && (
+                <p className="text-[11px] text-[#767680]">
+                  and {alarms.length - 3} more on Process Monitor
+                </p>
+              )}
             </div>
           </div>
 
@@ -261,18 +289,34 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
 
             <div className="space-y-2">
-              {INITIAL_REPORTS.slice(0, 2).map((rep) => (
+              {reports.length === 0 && (
+                <p className="text-xs text-[#767680] py-2">
+                  Nothing generated yet.
+                </p>
+              )}
+
+              {reports.slice(0, 2).map((rep) => (
                 <div
                   key={rep.id}
                   onClick={() => onViewReport(rep)}
                   className="p-3 bg-[#f7f9fc] hover:bg-[#eceef1] rounded-lg border border-[#e0e3e6] flex items-center justify-between text-xs cursor-pointer transition-colors"
                 >
-                  <div>
-                    <div className="font-bold text-[#061449]">{rep.title}</div>
-                    <div className="text-[10px] text-[#767680]">{rep.statusText}</div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-[#061449] truncate">{rep.title}</div>
+                    <div className="text-[10px] text-[#767680] truncate">
+                      {rep.generatedAt} &middot; {rep.statusText}
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2D6A4F]/15 text-[#2D6A4F]">
-                    {rep.fileFormat}
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                      rep.status === 'generating'
+                        ? 'bg-[#FFB703]/20 text-[#8a6100]'
+                        : rep.status === 'failed'
+                        ? 'bg-[#BA1A1A]/10 text-[#BA1A1A]'
+                        : 'bg-[#2D6A4F]/15 text-[#2D6A4F]'
+                    }`}
+                  >
+                    {rep.status === 'generating' ? 'Working' : rep.fileFormat}
                   </span>
                 </div>
               ))}

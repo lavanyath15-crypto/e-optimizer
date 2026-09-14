@@ -1,16 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart3, AlertTriangle } from 'lucide-react';
-import { usePlantFigures } from '../hooks/usePlantFigures';
-import { TRAINED_MIN_TPD, TRAINED_MAX_TPD } from '../hooks/usePlantInput';
+import { usePlantFigures } from '../../hooks/usePlantFigures';
+import { TRAINED_MIN_TPD, TRAINED_MAX_TPD } from '../../hooks/usePlantInput';
 import {
   SWEEP_SERIES,
   barHeightPct,
   seriesRange,
   sweepThroughput,
   type SweepMetric,
-} from '../lib/throughputSweep';
-import { ReadingSourceBar } from './ReadingSourceBar';
-import type { TabType } from '../types';
+} from '../../lib/throughputSweep';
+import { ReadingSourceBar } from '../../components/ReadingSourceBar';
+import type { TabType } from '../../types';
 
 /**
  * How the model responds to throughput.
@@ -23,11 +23,11 @@ import type { TabType } from '../types';
  * the range it was trained on. The metric buttons now switch real series rather
  * than relabelling the same shape.
  */
-interface AnalyticsViewProps {
+interface AnalyticsSectionProps {
   onNavigateTab?: (tab: TabType) => void;
 }
 
-export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateTab }) => {
+export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ onNavigateTab }) => {
   const { model, loading, error, grainInputTpd, source, updatedAt } = usePlantFigures();
   const [metric, setMetric] = useState<SweepMetric>('distillationSteamKg');
 

@@ -10,7 +10,14 @@ import {
   bushelsPerHourToTonnesPerDay,
   tonnesPerDayToBushelsPerHour,
 } from './grainFeed';
-import { PROCESS_DEFAULTS, PROCESS_UNITS } from '../data/processUnits';
+import { PROCESS_DEFAULTS, PROCESS_UNITS, type ProcessValues } from '../data/processUnits';
+import {
+  DEFAULT_GRAIN_INPUT_TPD,
+  GRAIN_INPUT_MAX_TPD,
+  GRAIN_INPUT_MIN_TPD,
+  refluxOf,
+  throughputOf,
+} from '../hooks/usePlantInput';
 
 describe('KG_PER_BUSHEL_CORN', () => {
   it('is 56 lb, the legal definition for corn', () => {
@@ -63,8 +70,41 @@ describe('the milling field agrees with the model', () => {
   });
 
   it('keeps the whole input range within what the model can be asked', () => {
-    // The hard max still allows extrapolation, which the UI warns about, but it
-    // should not allow an absurd figure.
-    expect(bushelsPerHourToTonnesPerDay(feedRate.max)).toBeLessThan(1500);
+    // The hard bounds on this field are the plant's throughput bounds, because
+    // this field *is* the throughput. Capping tonnes downstream instead is what
+    // let the bushel reading on screen and the tonnage the rest of the dashboard
+    // ran on describe different plants.
+    expect(bushelsPerHourToTonnesPerDay(feedRate.min)).toBeGreaterThan(0);
+    expect(bushelsPerHourToTonnesPerDay(feedRate.max)).toBeCloseTo(400, 0);
+  });
+
+  it('exposes the same bounds through the store as the field carries', () => {
+    expect(GRAIN_INPUT_MIN_TPD).toBeCloseTo(bushelsPerHourToTonnesPerDay(feedRate.min), 9);
+    expect(GRAIN_INPUT_MAX_TPD).toBeCloseTo(bushelsPerHourToTonnesPerDay(feedRate.max), 9);
+    expect(DEFAULT_GRAIN_INPUT_TPD).toBeCloseTo(
+      bushelsPerHourToTonnesPerDay(PROCESS_DEFAULTS.milling.feedRate),
+      9
+    );
+  });
+});
+
+describe('throughputOf and refluxOf', () => {
+  const readings: ProcessValues = {
+    milling: { feedRate: 230, moisture: 14.2, screenSize: 3.2 },
+    liquefaction: { cookTemp: 225.4, ph: 5.65, enzymeDose: 12.5 },
+    fermentation: { abv: 14.82, temp: 89.2, durationH: 54 },
+    distillation: { steamPressure: 148.5, refluxRatio: 2.3, feedRate: 1420 },
+    drying: { throughput: 38.2, outletMoisture: 9.8, inletTemp: 410 },
+  };
+
+  it('derives throughput from the milling feed rate rather than a stored copy', () => {
+    // The regression this guards: throughput used to be stored beside the
+    // readings, so the advisory card could change one without the other and
+    // Overview would show 242 bu/hr while Carbon computed a different tonnage.
+    expect(throughputOf(readings)).toBeCloseTo(bushelsPerHourToTonnesPerDay(230), 9);
+  });
+
+  it('derives reflux from the beer column reading', () => {
+    expect(refluxOf(readings)).toBe(2.3);
   });
 });

@@ -155,3 +155,27 @@ export const DISTILLATION_SCENARIOS: DistillationScenarioInput[] = [
 ];
 
 export const CURRENT_OPERATION_SCENARIO_ID = 'S4';
+
+/**
+ * The scenario the plant is actually sitting on, given the reflux the operator
+ * submitted.
+ *
+ * Carbon worked this out by nearest reflux while AI Optimization assumed S4
+ * unconditionally, so submitting 2.30 produced two screens that disagreed about
+ * the same reading: one said "closest to S1", the other still labelled S4
+ * "(current)" and computed its savings from there. Both now call this.
+ */
+export function resolveCurrentScenario(
+  scenarios: DistillationScenarioResult[],
+  refluxRatio: number | null
+): DistillationScenarioResult {
+  const fallback =
+    scenarios.find((s) => s.id === CURRENT_OPERATION_SCENARIO_ID) ?? scenarios[0];
+  if (refluxRatio === null || !Number.isFinite(refluxRatio)) return fallback;
+
+  return scenarios.reduce(
+    (best, s) =>
+      Math.abs(s.refluxRatio - refluxRatio) < Math.abs(best.refluxRatio - refluxRatio) ? s : best,
+    fallback
+  );
+}
