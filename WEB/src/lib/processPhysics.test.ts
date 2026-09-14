@@ -18,7 +18,6 @@ import {
   yieldFactorForMoisture,
 } from './processPhysics';
 import { PROCESS_DEFAULTS, PROCESS_UNITS, type ProcessValues } from '../data/processUnits';
-import { bushelsPerHourToTonnesPerDay } from './grainFeed';
 import type { ConsumptionPrediction } from './annModel';
 
 function defaults(): ProcessValues {
@@ -29,7 +28,8 @@ function defaults(): ProcessValues {
   return fresh;
 }
 
-const NOMINAL_TPD = bushelsPerHourToTonnesPerDay(PROCESS_DEFAULTS.milling.feedRate);
+// The milling reading is tonnes per day now, so this is simply it.
+const NOMINAL_TPD = PROCESS_DEFAULTS.milling.feedRate;
 
 const baseline: ConsumptionPrediction = {
   electricityKwh: 2749,

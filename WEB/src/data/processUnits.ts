@@ -34,17 +34,13 @@ export const PROCESS_UNITS: ProcessUnit[] = [
     name: 'Milling',
     equipment: 'Hammermill 1-3',
     fields: [
-      // Sized to the plant the model was trained on, not to a typical US dry
-      // mill. 3,000-3,800 bu/hr was here before, which works out at roughly
-      // 2,100 t/day: a plant fourteen times the 147.4 t/day in the dataset. Now
-      // that submitting a reading drives the prediction, that gap would have
-      // pushed the network far outside its trained range on the first submit.
-      // The band below is the 124.5-165 t/day training range converted.
-      // The hard bounds are the throughput bounds: this field *is* the plant's
-      // throughput, so 1 to 656 bu/hr is 0.6 to 400 t/day. Capping the tonnage
-      // downstream instead of the bushels here is what used to let the feed rate
-      // on screen and the tonnage every other screen ran on say different things.
-      { key: 'feedRate', label: 'Grain Feed Rate', unit: 'bu/hr', min: 1, max: 656, step: 1, normalMin: 205, normalMax: 270, decimals: 0 },
+      // Grain input in tonnes per day, which is what the source dataset calls
+      // Grain_Input_tpd and what every other screen reports. It was in bushels
+      // per hour, so the one figure driving the whole dashboard was the only one
+      // an operator had to convert in their head -- and the bushel readout and
+      // the tonnage could be read as two different plants. Bushels are still
+      // shown underneath for anyone reading a mill scale.
+      { key: 'feedRate', label: 'Grain Input', unit: 't/day', min: 1, max: 400, step: 0.1, normalMin: 124.5, normalMax: 165, decimals: 1 },
       { key: 'moisture', label: 'Grain Moisture', unit: '%', min: 0, max: 30, step: 0.1, normalMin: 13, normalMax: 15.5, decimals: 1 },
       { key: 'screenSize', label: 'Screen Size', unit: 'mm', min: 1, max: 10, step: 0.1, normalMin: 2.8, normalMax: 4, decimals: 1 },
     ],
@@ -83,7 +79,7 @@ export const PROCESS_UNITS: ProcessUnit[] = [
       // two screens will disagree about what the plant is running.
       { key: 'refluxRatio', label: 'Reflux Ratio', unit: '', min: 0.5, max: 5, step: 0.01, normalMin: 2.3, normalMax: 3.1, decimals: 2 },
       // 1,300-1,550 GPM was here, with a 1,420 default. Beer flow is fixed by
-      // how much ethanol you make and how strong it is: 147.5 t/day of grain at
+      // how much ethanol you make and how strong it is: 147.4 t/day of grain at
       // 14.82% ABV is 71 GPM, so the old band described a plant 19.9x this one
       // -- about 2,936 t/day, the same oversized template the milling feed rate
       // came from. The band below is 124.5-165 t/day across a 13.5-16% ABV.
@@ -109,10 +105,8 @@ export const PROCESS_UNITS: ProcessUnit[] = [
 export type ProcessValues = Record<string, Record<string, number>>;
 
 export const PROCESS_DEFAULTS: ProcessValues = {
-  // 242 bu/hr works out at 147.5 t/day, the closest whole bushel rate to the
-  // dataset's nominal 147.4. The two differ in the first decimal, so the figure
-  // shown after a submit is 147.5 and not the 147.4 seen before one.
-  milling: { feedRate: 242, moisture: 14.2, screenSize: 3.2 },
+  // The dataset's nominal throughput, exactly. No conversion, no rounding.
+  milling: { feedRate: 147.4, moisture: 14.2, screenSize: 3.2 },
   liquefaction: { cookTemp: 225.4, ph: 5.65, enzymeDose: 12.5 },
   fermentation: { abv: 14.82, temp: 89.2, durationH: 54 },
   // refluxRatio matches scenario S4, the current operating point in

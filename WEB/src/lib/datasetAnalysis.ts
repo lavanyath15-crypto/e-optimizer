@@ -18,6 +18,7 @@
  * and it is arithmetic, not the model's opinion.
  */
 
+import * as XLSX from 'xlsx';
 import { predictConsumption, type AnnModel } from './annModel';
 
 export const DATASET_LIMITS = {
@@ -216,6 +217,134 @@ export function parseDataset(text: string, fileName = ''): ParsedCsv {
 
   return parseCsv(text, detectDelimiter(text));
 }
+
+/**
+ * Parses an Excel binary workbook (.xlsx, .xls) into ParsedCsv.
+ * Supports both standard horizontal tabular sheets and vertical parameter-value sheets.
+ */
+export function parseExcelWorkbook(buffer: ArrayBuffer | Uint8Array, fileName = ''): ParsedCsv {
+  let wb: XLSX.WorkBook;
+  try {
+    wb = XLSX.read(buffer, { type: 'array' });
+  } catch (err) {
+    throw new DatasetError(`Could not open ${fileName || 'Excel file'}: ${(err as Error).message}`);
+  }
+
+  if (!wb.SheetNames || wb.SheetNames.length === 0) {
+    throw new DatasetError('The Excel workbook contains no sheets.');
+  }
+
+  // Look for preferred sheets if multiple exist
+  const sheetName =
+    wb.SheetNames.find((s) => s.toLowerCase().includes('tabular')) ||
+    wb.SheetNames.find((s) => s.toLowerCase().includes('parameter')) ||
+    wb.SheetNames[0];
+
+  const sheet = wb.Sheets[sheetName];
+  if (!sheet) {
+    throw new DatasetError('Selected sheet could not be read.');
+  }
+
+  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    raw: false,
+    defval: '',
+  });
+
+  if (!rawRows || rawRows.length === 0) {
+    throw new DatasetError('The Excel sheet has no rows in it.');
+  }
+
+  // Check if this sheet is a Vertical Parameter format (e.g. Stage | Parameter | Value or Parameter | Value)
+  const headerRow = (rawRows[0] || []).map((c) => String(c ?? '').trim());
+  const headerRowLower = headerRow.map((h) => h.toLowerCase());
+  const paramIdx = headerRowLower.findIndex((h) =>
+    ['column_key', 'parameter', 'key', 'variable', 'name'].includes(h)
+  );
+  const valIdx = headerRowLower.findIndex((h) =>
+    ['value', 'reading', 'setpoint', 'val'].includes(h)
+  );
+
+  if (paramIdx !== -1 && valIdx !== -1 && rawRows.length > 2) {
+    const headers: string[] = [];
+    const rowValues: string[] = [];
+
+    for (let r = 1; r < rawRows.length; r++) {
+      const row = rawRows[r] as unknown[];
+      if (!row || !Array.isArray(row)) continue;
+      const paramName = String(row[paramIdx] ?? '').trim();
+      const val = String(row[valIdx] ?? '').trim();
+      if (paramName) {
+        headers.push(paramName);
+        rowValues.push(val);
+      }
+    }
+
+    if (headers.length > 0) {
+      return {
+        headers,
+        rows: [rowValues],
+        truncatedRows: 0,
+      };
+    }
+  }
+
+  // Standard Tabular format: Row 0 is headers, Row 1..N are data
+  const headers = headerRow.filter(Boolean);
+  if (headers.length === 0) {
+    throw new DatasetError('The Excel sheet does not contain a header row.');
+  }
+  if (headers.length > DATASET_LIMITS.columns) {
+    throw new DatasetError(
+      `That file has ${headers.length} columns, more than the ${DATASET_LIMITS.columns} this can handle.`
+    );
+  }
+
+  const bodyRows: string[][] = [];
+  let truncatedRows = 0;
+
+  for (let i = 1; i < rawRows.length; i++) {
+    const row = rawRows[i] as unknown[];
+    if (!row || !Array.isArray(row)) continue;
+    const cells = headers.map((_, colIdx) => String(row[colIdx] ?? '').trim());
+    if (cells.some((c) => c !== '')) {
+      if (bodyRows.length < DATASET_LIMITS.rows) {
+        bodyRows.push(cells);
+      } else {
+        truncatedRows++;
+      }
+    }
+  }
+
+  if (bodyRows.length === 0) {
+    throw new DatasetError('The Excel sheet has a header row but no data rows.');
+  }
+
+  return {
+    headers,
+    rows: bodyRows,
+    truncatedRows,
+  };
+}
+
+/**
+ * Handles File objects directly, dispatching to Excel binary or text parser.
+ */
+export async function parseDatasetFile(file: File): Promise<ParsedCsv> {
+  const isExcel =
+    /\.xlsx?$/i.test(file.name) ||
+    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    file.type === 'application/vnd.ms-excel';
+
+  if (isExcel) {
+    const buffer = await file.arrayBuffer();
+    return parseExcelWorkbook(buffer, file.name);
+  }
+
+  const text = await file.text();
+  return parseDataset(text, file.name);
+}
+
 
 export interface ColumnStats {
   name: string;

@@ -99,7 +99,14 @@ export function usePlantFigures(): PlantFigures {
 
   const emissions =
     consumption && physics
-      ? computeEmissions(consumption, grainInputTpd, physics.adjusted.ethanolKl)
+      ? computeEmissions(
+          consumption,
+          grainInputTpd,
+          physics.adjusted.ethanolKl,
+          // The operator's own header pressure sets the latent heat, and the
+          // latent heat sets how much fuel the steam costs.
+          readings.distillation.steamPressure
+        )
       : null;
 
   return {

@@ -94,13 +94,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* The model behind the figures. A pulsing "Grid Synced · 4.85 kGal/h"
-            used to sit here, connected to nothing. */}
-        <div className="mx-4 mb-4 px-3.5 py-2 rounded-lg bg-[#1e2a5e]/70 border border-[#384378]/40 flex items-center justify-between text-xs">
-          <span className="font-semibold text-white/90 text-[11px]">Consumption model</span>
-          <span className="text-[11px] font-mono text-[#dde1ff]">in-browser</span>
-        </div>
-
         {/* Main Navigation items */}
         <div className="flex-1 overflow-y-auto px-2 space-y-1 custom-scrollbar">
           {navItems.map((item) => {

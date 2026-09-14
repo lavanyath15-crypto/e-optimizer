@@ -1,8 +1,11 @@
 /**
- * The emission factors are the project's headline claim: applying them
- * reproduces the source dataset's own CO2e column to within 0.006%. ml/verify.py
- * proves that against the spreadsheet in Python. These prove the TypeScript that
- * actually runs in the browser agrees with it.
+ * Electricity and dryer fuel are still priced by the factors recovered from the
+ * source dataset. Steam is not: its recovered factor implied a boiler efficiency
+ * of 167%, so it now goes through the physical chain in lib/thermalChain.ts.
+ *
+ * These tests therefore no longer reproduce the dataset's own CO2e column, and
+ * that is the point. They check the chain instead, and pin the impossibility
+ * that retired the old factor.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -14,6 +17,7 @@ import {
   DRYER_FUEL_KG_CO2E_PER_MMBTU,
   KWH_PER_MMBTU,
 } from './emissionsFormula';
+import { steamChain, impliedBoilerEfficiency } from './thermalChain';
 
 describe('ethanolProductionKl', () => {
   it('applies the 390 L per tonne basis', () => {
@@ -33,21 +37,35 @@ describe('computeEmissions', () => {
     dryerFuelMmbtu: 53.520339,
   };
 
-  it('splits CO2e by the three recovered factors', () => {
+  it('prices electricity and dryer fuel by their recovered factors', () => {
     const result = computeEmissions(consumption, 145);
 
     expect(result.electricityCo2eKg).toBeCloseTo(
       consumption.electricityKwh * ELECTRICITY_KG_CO2E_PER_KWH,
       6
     );
-    expect(result.steamCo2eKg).toBeCloseTo(
-      consumption.distillationSteamKg * DISTILLATION_STEAM_KG_CO2E_PER_KG,
-      6
-    );
     expect(result.fuelCo2eKg).toBeCloseTo(
       consumption.dryerFuelMmbtu * DRYER_FUEL_KG_CO2E_PER_MMBTU,
       6
     );
+  });
+
+  it('prices steam through the chain, not the flat factor', () => {
+    const result = computeEmissions(consumption, 145);
+    const chain = steamChain(consumption.distillationSteamKg, 148.5);
+
+    expect(result.steamCo2eKg).toBeCloseTo(chain.co2eKg, 6);
+    // Well above what the retired factor produced, because that factor was
+    // charging the plant for less fuel than the heat it delivered.
+    expect(result.steamCo2eKg).toBeGreaterThan(
+      consumption.distillationSteamKg * DISTILLATION_STEAM_KG_CO2E_PER_KG
+    );
+  });
+
+  it('records why the flat steam factor was retired', () => {
+    // A boiler cannot return more heat than its fuel carries. This is the whole
+    // justification for the chain, so it is pinned rather than left in a comment.
+    expect(impliedBoilerEfficiency(DISTILLATION_STEAM_KG_CO2E_PER_KG, 148.5)).toBeGreaterThan(1);
   });
 
   it('totals the three parts and converts to tonnes', () => {
@@ -61,13 +79,13 @@ describe('computeEmissions', () => {
 
   it('turns the verify.py reference consumption into intensity for 145 t/day', () => {
     // The consumption fixture above is what ml/verify.py prints for grain input
-    // 145.0. verify.py stops there, so the intensity is derived here from the
-    // same three factors rather than quoted from it.
+    // 145.0. verify.py stops there, so the intensity is derived here rather than
+    // quoted from it.
     const result = computeEmissions(consumption, 145);
 
     const expectedKg =
       consumption.electricityKwh * ELECTRICITY_KG_CO2E_PER_KWH +
-      consumption.distillationSteamKg * DISTILLATION_STEAM_KG_CO2E_PER_KG +
+      steamChain(consumption.distillationSteamKg, 148.5).co2eKg +
       consumption.dryerFuelMmbtu * DRYER_FUEL_KG_CO2E_PER_MMBTU;
 
     expect(result.ethanolProductionKl).toBeCloseTo(56.55, 2);
@@ -75,12 +93,13 @@ describe('computeEmissions', () => {
     expect(result.co2eIntensityKgPerKl).toBeCloseTo(expectedKg / 56.55, 6);
 
     // Pinned so a change to any factor has to be a deliberate edit here too.
-    expect(result.co2eIntensityKgPerKl).toBeCloseTo(184.682888, 5);
+    // It was 184.68 while steam was priced by the impossible flat factor.
+    expect(result.co2eIntensityKgPerKl).toBeCloseTo(295.94, 1);
   });
 
-  it('leaves steam out of the energy intensity', () => {
-    // The dataset gives no boiler efficiency to convert steam mass into energy,
-    // so it is deliberately excluded rather than guessed at.
+  it('keeps the legacy kWh/kL figure free of steam', () => {
+    // Retained only for continuity with the old headline. The figure that
+    // matters now is energyIntensityGjPerKl, which does include steam.
     const result = computeEmissions(consumption, 145);
     const expectedKwh =
       consumption.electricityKwh + consumption.dryerFuelMmbtu * KWH_PER_MMBTU;

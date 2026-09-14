@@ -3,10 +3,10 @@ import { TabType, ReportItem } from '../../types';
 import { deriveAlarms } from '../../lib/plantAlarms';
 import { usePlantFigures } from '../../hooks/usePlantFigures';
 import { buildPlantMetrics, formatMetricValue, isWeak } from '../../lib/plantMetrics';
-import { ReadingSourceBar } from '../../components/ReadingSourceBar';
 import { usePlantInput } from '../../hooks/usePlantInput';
 import { PROCESS_UNITS, isInBand, formatValue } from '../../data/processUnits';
 import { AlertTriangle, FileText, Sparkles, ArrowUpRight } from 'lucide-react';
+import { DataSourceBanner } from '../../components/DataSourceBanner';
 
 interface OverviewSectionProps {
   onNavigateTab: (tab: TabType) => void;
@@ -26,9 +26,8 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
   onOpenAiAssistant,
   reports
 }) => {
-  const { model, consumption, emissions, loading, error, grainInputTpd, source, updatedAt } =
-    usePlantFigures();
-  const { readings } = usePlantInput();
+  const { model, consumption, emissions, loading, error } = usePlantFigures();
+  const { readings, hasSubmitted, source, updatedAt, grainInputTpd } = usePlantInput();
   const alarms = deriveAlarms(readings);
   const metrics =
     model && consumption && emissions ? buildPlantMetrics(consumption, emissions, model) : [];
@@ -69,11 +68,14 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
 
       {/* KPI cards, computed live from the network and the emission formulas at
           whatever throughput was last submitted on Process Monitor. */}
-      <ReadingSourceBar
-        grainInputTpd={grainInputTpd}
+
+      {/* Data source provenance banner */}
+      <DataSourceBanner
+        hasSubmitted={hasSubmitted}
         source={source}
         updatedAt={updatedAt}
-        onNavigateTab={onNavigateTab}
+        grainInputTpd={grainInputTpd}
+        onGoToProcessMonitor={() => onNavigateTab('process-monitor')}
       />
 
       {error && (

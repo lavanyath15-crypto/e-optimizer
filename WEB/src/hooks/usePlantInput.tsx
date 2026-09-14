@@ -34,10 +34,7 @@ import {
   clampToField,
   type ProcessValues,
 } from '../data/processUnits';
-import {
-  bushelsPerHourToTonnesPerDay,
-  tonnesPerDayToBushelsPerHour,
-} from '../lib/grainFeed';
+import { bushelsPerHourToTonnesPerDay } from '../lib/grainFeed';
 
 /** The unit and field that drive the model. Named once, used everywhere. */
 export const THROUGHPUT_UNIT_ID = 'milling';
@@ -54,23 +51,24 @@ export const TRAINED_MAX_TPD = 165.0;
  * the derived figure, so the bushel reading on screen and the tonnage every
  * other screen runs on are always the same operating point.
  */
-export const GRAIN_INPUT_MIN_TPD = bushelsPerHourToTonnesPerDay(
-  PROCESS_UNITS.find((u) => u.id === THROUGHPUT_UNIT_ID)!.fields.find(
-    (f) => f.key === THROUGHPUT_FIELD_KEY
-  )!.min
-);
-export const GRAIN_INPUT_MAX_TPD = bushelsPerHourToTonnesPerDay(
-  PROCESS_UNITS.find((u) => u.id === THROUGHPUT_UNIT_ID)!.fields.find(
-    (f) => f.key === THROUGHPUT_FIELD_KEY
-  )!.max
-);
+export const GRAIN_INPUT_MIN_TPD = PROCESS_UNITS.find(
+  (u) => u.id === THROUGHPUT_UNIT_ID
+)!.fields.find((f) => f.key === THROUGHPUT_FIELD_KEY)!.min;
+export const GRAIN_INPUT_MAX_TPD = PROCESS_UNITS.find(
+  (u) => u.id === THROUGHPUT_UNIT_ID
+)!.fields.find((f) => f.key === THROUGHPUT_FIELD_KEY)!.max;
 
 /** Throughput before the operator has entered anything, from the defaults. */
-export const DEFAULT_GRAIN_INPUT_TPD = bushelsPerHourToTonnesPerDay(
-  PROCESS_DEFAULTS[THROUGHPUT_UNIT_ID][THROUGHPUT_FIELD_KEY]
-);
+export const DEFAULT_GRAIN_INPUT_TPD =
+  PROCESS_DEFAULTS[THROUGHPUT_UNIT_ID][THROUGHPUT_FIELD_KEY];
 
-const STORAGE_KEY = 'eoptimizer-plant-readings';
+const STORAGE_KEY = 'eoptimizer-plant-readings-v2';
+/**
+ * v1 held the milling feed rate in bushels per hour. Read as tonnes per day a
+ * stored 242 would become a 242 t/day plant, so it is converted on the way in
+ * rather than silently reinterpreted.
+ */
+const LEGACY_BUSHEL_READINGS_KEY = 'eoptimizer-plant-readings';
 /** Keys from earlier builds, read once so a returning operator keeps their work. */
 const LEGACY_PLANT_INPUT_KEY = 'eoptimizer-plant-input';
 const LEGACY_PROCESS_INPUTS_KEY = 'eoptimizer-process-inputs';
@@ -100,11 +98,6 @@ export interface PlantInput {
 
   /** Process Monitor, on submit. Merges over whatever is already held. */
   applyProcessReadings: (values: ProcessValues) => void;
-  /**
-   * The advisory card's throughput box. Writes *back* into the milling feed
-   * rate, so changing it here changes the reading Process Monitor shows.
-   */
-  setGrainInputTpd: (tonnesPerDay: number) => void;
 }
 
 interface StoredState {
@@ -168,6 +161,27 @@ function readStored(): StoredState {
       };
     }
 
+    const bushelEra = localStorage.getItem(LEGACY_BUSHEL_READINGS_KEY);
+    if (bushelEra) {
+      const parsed = JSON.parse(bushelEra) as Partial<StoredState>;
+      const converted = mergeReadings(defaultReadings(), parsed.readings);
+      const storedBushels = (parsed.readings as ProcessValues | undefined)?.[THROUGHPUT_UNIT_ID]?.[
+        THROUGHPUT_FIELD_KEY
+      ];
+      if (typeof storedBushels === 'number' && Number.isFinite(storedBushels)) {
+        Object.assign(
+          converted,
+          writeThroughput(converted, bushelsPerHourToTonnesPerDay(storedBushels))
+        );
+      }
+      return {
+        readings: converted,
+        hasSubmitted: parsed.hasSubmitted === true,
+        source: parsed.source ?? 'default',
+        updatedAt: parsed.updatedAt ?? null,
+      };
+    }
+
     // Migration. Earlier builds stored the readings and the throughput apart;
     // the readings win, and the throughput is folded back into the feed rate so
     // a returning operator sees the same tonnage they left with.
@@ -213,31 +227,29 @@ function readStored(): StoredState {
   return { ...DEFAULT_STATE, readings: defaultReadings() };
 }
 
-/**
- * Puts a tonnes-per-day figure back into the feed rate field it is derived from.
- *
- * Rounded to the field's own precision so the store holds a reading an operator
- * could have typed. Without it, entering 150 t/day on the advisory card left
- * 246.05163190276514 bu/hr sitting in the Process Monitor input.
- */
+/** Writes a tonnes-per-day figure into the field that now holds it directly. */
 function writeThroughput(readings: ProcessValues, tonnesPerDay: number): ProcessValues {
   const unit = PROCESS_UNITS.find((u) => u.id === THROUGHPUT_UNIT_ID)!;
   const field = unit.fields.find((f) => f.key === THROUGHPUT_FIELD_KEY)!;
   const scale = 10 ** field.decimals;
-  const bushels = Math.round(tonnesPerDayToBushelsPerHour(tonnesPerDay) * scale) / scale;
 
   return {
     ...readings,
     [THROUGHPUT_UNIT_ID]: {
       ...readings[THROUGHPUT_UNIT_ID],
-      [THROUGHPUT_FIELD_KEY]: clampToField(field, bushels),
+      [THROUGHPUT_FIELD_KEY]: clampToField(field, Math.round(tonnesPerDay * scale) / scale),
     },
   };
 }
 
-/** Throughput implied by a reading set. The one conversion, in one place. */
+/**
+ * Throughput from a reading set.
+ *
+ * Now the reading itself: the milling field is in tonnes per day, so there is no
+ * conversion left to get wrong between what is typed and what the model is asked.
+ */
 export function throughputOf(readings: ProcessValues): number {
-  return bushelsPerHourToTonnesPerDay(readings[THROUGHPUT_UNIT_ID][THROUGHPUT_FIELD_KEY]);
+  return readings[THROUGHPUT_UNIT_ID][THROUGHPUT_FIELD_KEY];
 }
 
 /** Beer column reflux from a reading set. */
@@ -268,16 +280,6 @@ export function PlantInputProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const setGrainInputTpd = useCallback((tonnesPerDay: number) => {
-    if (!Number.isFinite(tonnesPerDay)) return;
-    setState((prev) => ({
-      readings: writeThroughput(prev.readings, tonnesPerDay),
-      hasSubmitted: true,
-      source: 'advisor',
-      updatedAt: stamp(),
-    }));
-  }, []);
-
   const value = useMemo<PlantInput>(() => {
     const grainInputTpd = throughputOf(state.readings);
 
@@ -290,9 +292,8 @@ export function PlantInputProvider({ children }: { children: ReactNode }) {
       updatedAt: state.updatedAt,
       isExtrapolating: grainInputTpd < TRAINED_MIN_TPD || grainInputTpd > TRAINED_MAX_TPD,
       applyProcessReadings,
-      setGrainInputTpd,
     };
-  }, [state, applyProcessReadings, setGrainInputTpd]);
+  }, [state, applyProcessReadings]);
 
   return <PlantInputContext.Provider value={value}>{children}</PlantInputContext.Provider>;
 }

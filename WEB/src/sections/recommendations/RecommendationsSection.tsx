@@ -3,8 +3,8 @@ import { Sparkles, Bot, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { usePlantFigures } from '../../hooks/usePlantFigures';
 import { buildPlantState } from '../../lib/plantState';
 import { getRecommendations } from '@backend/recommend.js';
-import { DatasetAnalysisCard } from './DatasetAnalysisCard';
 import { TabType } from '../../types';
+import { DataSourceBanner } from '../../components/DataSourceBanner';
 
 interface RecommendationsSectionProps {
   onNavigateTab?: (tab: TabType) => void;
@@ -20,7 +20,7 @@ interface RecommendationsSectionProps {
  * only the numbers it is given.
  */
 export const RecommendationsSection: React.FC<RecommendationsSectionProps> = ({ onNavigateTab }) => {
-  const { model, loading, error, grainInputTpd, readings } = usePlantFigures();
+  const { model, loading, error, grainInputTpd, readings, hasSubmitted, source, updatedAt } = usePlantFigures();
 
   const [advice, setAdvice] = useState<string | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
@@ -85,6 +85,15 @@ export const RecommendationsSection: React.FC<RecommendationsSectionProps> = ({ 
         </button>
       </div>
 
+      {/* Data source provenance banner */}
+      <DataSourceBanner
+        hasSubmitted={hasSubmitted}
+        source={source}
+        updatedAt={updatedAt}
+        grainInputTpd={grainInputTpd}
+        onGoToProcessMonitor={onNavigateTab ? () => onNavigateTab('process-monitor') : undefined}
+      />
+
       {error && (
         <div className="flex items-start gap-2 p-3.5 bg-[#BA1A1A]/5 border border-[#BA1A1A]/25 rounded-xl text-xs text-[#BA1A1A]">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -122,7 +131,6 @@ export const RecommendationsSection: React.FC<RecommendationsSectionProps> = ({ 
         </div>
       )}
 
-      <DatasetAnalysisCard />
 
       {advice && (
         <div

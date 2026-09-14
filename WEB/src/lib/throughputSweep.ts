@@ -24,6 +24,7 @@ export interface SweepPoint {
   dryerFuelMmbtu: number;
   co2eIntensityKgPerKl: number;
   totalEnergyIntensityKwhPerKl: number;
+  energyIntensityGjPerKl: number;
 }
 
 export type SweepMetric = keyof Omit<SweepPoint, 'grainInputTpd'>;
@@ -59,10 +60,13 @@ export const SWEEP_SERIES: SeriesDefinition[] = [
     decimals: 1,
   },
   {
-    key: 'totalEnergyIntensityKwhPerKl',
+    // GJ/kL, because that is the unit an energy balance is quoted in and it is
+    // the only one that can carry steam. The kWh/kL series it replaced left the
+    // largest thermal load on the site out of an "energy intensity".
+    key: 'energyIntensityGjPerKl',
     label: 'Energy Intensity',
-    unit: 'kWh/kL',
-    decimals: 1,
+    unit: 'GJ/kL',
+    decimals: 2,
   },
 ];
 
@@ -109,7 +113,8 @@ export function sweepThroughput(
     const emissions = computeEmissions(
       consumption,
       grainInputTpd,
-      physics?.adjusted.ethanolKl
+      physics?.adjusted.ethanolKl,
+      readings?.distillation.steamPressure
     );
 
     points.push({
@@ -120,6 +125,7 @@ export function sweepThroughput(
       dryerFuelMmbtu: consumption.dryerFuelMmbtu,
       co2eIntensityKgPerKl: emissions.co2eIntensityKgPerKl,
       totalEnergyIntensityKwhPerKl: emissions.totalEnergyIntensityKwhPerKl,
+      energyIntensityGjPerKl: emissions.energyIntensityGjPerKl,
     });
   }
 

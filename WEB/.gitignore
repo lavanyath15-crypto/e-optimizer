@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local Supabase CLI cache. The real functions/migrations live in
+# backend/supabase/; this only ever appears if the CLI gets run from WEB/ by
+# mistake, same as backend/.gitignore already excludes for its own supabase/.temp/.
+supabase/.temp/

@@ -15,11 +15,13 @@ import {
   DATASET_LIMITS,
   DatasetError,
   analyseDataset as analyseLocally,
-  parseDataset,
+  parseDatasetFile,
   summaryForPrompt,
   type DatasetSummary,
 } from '../../lib/datasetAnalysis';
 import { analyseDataset as askModel } from '@backend/recommend.js';
+import { suggestReadings, toProcessValues } from '../../lib/datasetReadings';
+import { usePlantInput } from '../../hooks/usePlantInput';
 
 /**
  * Upload a plant export, get it reviewed.
@@ -42,9 +44,23 @@ export const DatasetAnalysisCard: React.FC = () => {
   const [provider, setProvider] = useState<string | null>(null);
   const [adviceError, setAdviceError] = useState<string | null>(null);
   const [isAsking, setIsAsking] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const { applyProcessReadings } = usePlantInput();
+
+  // Columns the export carries that map onto a Process Monitor reading. The
+  // operator confirms before anything is written: this rewrites the operating
+  // point every other screen runs on, so it is not done silently.
+  const suggestion = summary ? suggestReadings(summary.numericColumns) : null;
+
+  const applyToProcessMonitor = () => {
+    if (!suggestion || suggestion.readings.length === 0) return;
+    applyProcessReadings(toProcessValues(suggestion.readings));
+    setApplied(true);
+  };
 
   const reset = () => {
     setSummary(null);
+    setApplied(false);
     setParseError(null);
     setAdvice(null);
     setAdviceError(null);
@@ -65,9 +81,8 @@ export const DatasetAnalysisCard: React.FC = () => {
         );
       }
 
-      const text = await file.text();
-      // Dispatches on content: CSV, TSV, semicolon- or pipe-delimited, or JSON.
-      const parsed = parseDataset(text, file.name);
+      // Dispatches on content/extension: XLSX, XLS, CSV, TSV, semicolon- or pipe-delimited, or JSON.
+      const parsed = await parseDatasetFile(file);
       setSummary(analyseLocally(file.name, parsed, model));
     } catch (err) {
       setParseError(
@@ -162,19 +177,19 @@ export const DatasetAnalysisCard: React.FC = () => {
             </button>
           </p>
           <p className="text-[11px] text-[#767680] mt-3">
-            CSV, TSV, semicolon or pipe delimited, or JSON. The separator is detected, so there is no
-            need to convert anything. Up to {DATASET_LIMITS.fileBytes / 1024 / 1024} MB and{' '}
+            Excel (.xlsx, .xls), CSV, TSV, semicolon or pipe delimited, or JSON. The format and delimiter
+            are detected automatically. Up to {DATASET_LIMITS.fileBytes / 1024 / 1024} MB and{' '}
             {DATASET_LIMITS.rows.toLocaleString()} rows.
           </p>
           <p className="text-[11px] text-[#767680] mt-1">
-            Name a column <span className="font-mono">Grain_Input_tpd</span> to have consumption
-            scored against the model. Excel needs exporting to CSV first.
+            Name a column <span className="font-mono">Grain_Input_tpd</span> or use the standard process
+            parameter names to have consumption and stage readings scored and matched.
           </p>
 
           <input
             ref={inputRef}
             type="file"
-            accept=".csv,.tsv,.txt,.json,.dat,text/csv,text/plain,application/json"
+            accept=".xlsx,.xls,.csv,.tsv,.txt,.json,.dat,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain,application/json"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -216,6 +231,69 @@ export const DatasetAnalysisCard: React.FC = () => {
               <X className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Auto-populate. An export is a set of readings, so retyping the
+              same fifteen numbers by hand is work the browser can do. */}
+          {suggestion && suggestion.readings.length > 0 && (
+            <div className="p-4 bg-[#0f6e8c]/5 border border-[#0f6e8c]/25 rounded-xl space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h5 className="text-xs font-bold text-[#061449]">
+                    {suggestion.readings.length} of your columns match a Process Monitor reading
+                  </h5>
+                  <p className="text-[11px] text-[#45464f] mt-0.5">
+                    Each value is that column's mean across the export, because a file covers a
+                    period and the reading describing it is its average, not its last row.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={applyToProcessMonitor}
+                  disabled={applied}
+                  className="px-4 py-2 bg-[#0f6e8c] hover:bg-[#0b5670] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0"
+                >
+                  {applied ? 'Applied to Process Monitor' : 'Use these readings'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {suggestion.readings.map((r) => (
+                  <div
+                    key={`${r.unitId}.${r.fieldKey}`}
+                    className="flex items-baseline justify-between gap-2 text-[11px] bg-white rounded-lg border border-[#e0e3e6] px-2.5 py-1.5"
+                  >
+                    <span className="truncate text-[#45464f]">
+                      <strong className="text-[#061449]">{r.label}</strong>{' '}
+                      <span className="text-[#767680]">from {r.column}</span>
+                    </span>
+                    <span
+                      className={`font-mono font-bold shrink-0 ${
+                        r.clamped ? 'text-[#8a6100]' : 'text-[#061449]'
+                      }`}
+                    >
+                      {r.value.toFixed(2)}
+                      {r.unit && ` ${r.unit}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {suggestion.readings.some((r) => r.clamped) && (
+                <p className="text-[11px] text-[#8a6100]">
+                  Values in amber sat outside what the field accepts and were clamped. That usually
+                  means the column is in a different unit, so check it before relying on it.
+                </p>
+              )}
+
+              {suggestion.unmatched.length > 0 && (
+                <p className="text-[11px] text-[#767680]">
+                  No column matched {suggestion.unmatched.length} other{' '}
+                  {suggestion.unmatched.length === 1 ? 'reading' : 'readings'}, which keep their
+                  current values: {suggestion.unmatched.map((u) => u.label).join(', ')}.
+                </p>
+              )}
+            </div>
+          )}
 
           {summary.warnings.length > 0 && (
             <div className="space-y-1.5">

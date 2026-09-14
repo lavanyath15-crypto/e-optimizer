@@ -1,15 +1,13 @@
 import React from 'react';
 import { ASSETS } from '../data/mockData';
 import { useOperator } from '../hooks/useOperator';
-import { Search, Bell, Settings, Menu, RefreshCw, Mic, MicOff } from 'lucide-react';
+import { Search, Settings, Menu, RefreshCw, Mic, MicOff } from 'lucide-react';
 
 interface HeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onToggleMobileMenu: () => void;
-  onOpenNotifications: () => void;
   onOpenSettings: () => void;
-  unreadAlertsCount?: number;
   onQuickRefresh?: () => void;
   isRefreshing?: boolean;
   wakeWordSupported?: boolean;
@@ -23,11 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   searchQuery,
   onSearchChange,
   onToggleMobileMenu,
-  onOpenNotifications,
   onOpenSettings,
-  // Zero, not two. A default of 2 meant a caller that forgot to pass the real
-  // count still painted an alert dot on the bell.
-  unreadAlertsCount = 0,
   onQuickRefresh,
   isRefreshing = false,
   wakeWordSupported = false,
@@ -79,15 +73,6 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Trailing Actions */}
       <div className="flex items-center gap-3 md:gap-5 ml-4 md:ml-6">
-        {/* Plant Status Pill */}
-        {/* Names the plant rather than claiming a status nothing measures. A
-            pulsing green "Plant Status: Active" was here, wired to nothing. */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-[#eceef1] rounded-full border border-[#c6c5d1]">
-          <span className="text-[11px] font-bold tracking-wider text-[#45464f] uppercase">
-            Plant ETH-042
-          </span>
-        </div>
-
         {/* Wake word state. Lives here rather than only in the assistant,
             because the assistant is shut whenever the wake word is listening,
             so its own badge is invisible exactly when it matters. */}
@@ -137,24 +122,6 @@ export const Header: React.FC<HeaderProps> = ({
             <RefreshCw className="w-4 h-4" />
           </button>
         )}
-
-        {/* Notifications Icon Button */}
-        <button
-          onClick={onOpenNotifications}
-          className="relative p-2 text-[#45464f] hover:text-[#061449] hover:bg-[#eceef1] rounded-lg transition-colors cursor-pointer"
-          title={
-            unreadAlertsCount > 0
-              ? `${unreadAlertsCount} reading${unreadAlertsCount === 1 ? '' : 's'} outside band`
-              : 'Every reading is inside its band'
-          }
-        >
-          <Bell className="w-5 h-5" />
-          {unreadAlertsCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold text-white bg-[#ba1a1a] rounded-full border-2 border-white">
-              {unreadAlertsCount}
-            </span>
-          )}
-        </button>
 
         {/* Desktop Settings Icon */}
         <button

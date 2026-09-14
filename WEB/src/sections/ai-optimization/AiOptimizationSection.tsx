@@ -1,7 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { AI_SETPOINTS } from '../../data/mockData';
-import { AiOptimizationSetpoint } from '../../types';
-import { BrainCircuit, CheckCircle2, Sparkles, Sliders, ArrowRight, RotateCcw, AlertTriangle } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { BrainCircuit } from 'lucide-react';
 import {
   DISTILLATION_SCENARIOS,
   PURITY_MIN_PCT,
@@ -13,31 +11,10 @@ import {
 } from '../../lib/distillationEngine';
 import { PlantAdvisorCard } from './PlantAdvisorCard';
 import { usePlantInput } from '../../hooks/usePlantInput';
+import { DataSourceBanner } from '../../components/DataSourceBanner';
 
 export const AiOptimizationSection: React.FC = () => {
-  const { grainInputTpd, refluxRatio, hasSubmitted } = usePlantInput();
-  const [setpoints, setSetpoints] = useState<AiOptimizationSetpoint[]>(AI_SETPOINTS);
-  const [feedback, setFeedback] = useState<string | null>(null);
-
-  const handleApply = (id: string) => {
-    setSetpoints((prev) =>
-      prev.map((sp) => (sp.id === id ? { ...sp, status: 'applied' } : sp))
-    );
-    // Nothing is transmitted anywhere. This claimed "Setpoint command transmitted
-    // to Emerson DeltaV DCS controller", which is a sentence an operator could
-    // reasonably act on. There is no DCS connection in this project.
-    setFeedback('Marked as accepted on this screen only. Nothing was sent to a DCS.');
-    setTimeout(() => setFeedback(null), 4000);
-  };
-
-  const handleRevert = (id: string) => {
-    setSetpoints((prev) =>
-      prev.map((sp) => (sp.id === id ? { ...sp, status: 'pending' } : sp))
-    );
-    setFeedback('Marked as not accepted. Again, nothing left this browser.');
-    setTimeout(() => setFeedback(null), 4000);
-  };
-
+  const { grainInputTpd, refluxRatio, hasSubmitted, source, updatedAt } = usePlantInput();
   // Recomputed whenever the operator changes throughput, so the table describes
   // the plant they are actually running rather than a fixed nominal day.
   const distillationResults = useMemo(
@@ -82,98 +59,21 @@ export const AiOptimizationSection: React.FC = () => {
         </div>
       </div>
 
-      {feedback && (
-        <div className="p-4 bg-[#2D6A4F]/10 border border-[#2D6A4F]/30 rounded-xl text-xs font-bold text-[#2D6A4F] flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4" />
-          <span>{feedback}</span>
-        </div>
-      )}
+      {/* Data source provenance banner */}
+      <DataSourceBanner
+        hasSubmitted={hasSubmitted}
+        source={source}
+        updatedAt={updatedAt}
+        grainInputTpd={grainInputTpd}
+      />
 
-      {/* Setpoints Table/Cards */}
-      <div className="space-y-4">
-        {setpoints.map((sp) => {
-          const isApplied = sp.status === 'applied';
-
-          return (
-            <div
-              key={sp.id}
-              className={`p-6 rounded-xl border transition-all ${
-                isApplied
-                  ? 'bg-white border-[#2D6A4F]/40 shadow-xs'
-                  : 'bg-white border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)]'
-              }`}
-            >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1 max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-[#061449]">
-                      {sp.parameter}
-                    </h3>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        isApplied
-                          ? 'bg-[#2D6A4F]/15 text-[#2D6A4F]'
-                          : 'bg-[#FFB703]/20 text-[#8a6100]'
-                      }`}
-                    >
-                      {isApplied ? 'Closed Loop: Engaged' : 'AI Recommendation Available'}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-[#2D6A4F] font-semibold flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Gain: {sp.expectedGain}</span>
-                  </p>
-
-                  <p className="text-xs text-[#767680]">
-                    Safety Boundary: {sp.safetyMargin} • Confidence: <strong>{sp.confidence}%</strong>
-                  </p>
-                </div>
-
-                {/* Values Comparison */}
-                <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <span className="text-[11px] text-[#767680] block">Current</span>
-                    <span className="text-xl font-extrabold font-mono text-[#45464f]">
-                      {sp.currentValue} <span className="text-xs font-normal">{sp.unit}</span>
-                    </span>
-                  </div>
-
-                  <ArrowRight className="w-4 h-4 text-[#3d93ad]" />
-
-                  <div className="text-center">
-                    <span className="text-[11px] text-[#0f6e8c] font-bold block">Optimized</span>
-                    <span className="text-xl font-extrabold font-mono text-[#0f6e8c]">
-                      {sp.recommendedValue} <span className="text-xs font-normal">{sp.unit}</span>
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  <div>
-                    {isApplied ? (
-                      <button
-                        onClick={() => handleRevert(sp.id)}
-                        className="px-4 py-2 border border-[#c6c5d1] text-[#45464f] hover:bg-[#eceef1] rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Revert</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleApply(sp.id)}
-                        className="px-5 py-2.5 bg-[#0f6e8c] hover:bg-[#0b5670] text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Apply Setpoint</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* The two "AI setpoint" cards were here: glucoamylase dosing and
+          chilled water supply temperature. Every figure on them was invented --
+          a $620/day saving, a 94.8% confidence, a starch profile "confirmed" at
+          71.2% -- for two levers this project does not model at all, and the
+          Apply button only recoloured the card. The scenario table below is the
+          screen's real optimiser: it is computed, and it responds to the reflux
+          you submit. */}
 
       {/* Distillation Scenario Optimizer */}
       <div className="bg-white rounded-xl border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] p-6 space-y-5">

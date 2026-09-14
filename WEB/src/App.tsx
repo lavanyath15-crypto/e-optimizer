@@ -2,12 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { TabType, ReportItem } from './types';
 import { INITIAL_REPORTS } from './data/mockData';
 import { useWakeWord } from './hooks/useVoice';
-import { usePlantInput } from './hooks/usePlantInput';
-import { deriveAlarms } from './lib/plantAlarms';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { AiAssistantModal } from './components/AiAssistantModal';
-import { NotificationsModal } from './components/NotificationsModal';
 import { GenerateReportModal } from './sections/reports/GenerateReportModal';
 import { ReportDetailModal } from './sections/reports/ReportDetailModal';
 import { renderSection, type SectionContext } from './sections/registry';
@@ -29,16 +26,11 @@ export default function App() {
   const [reports, setReports] = useState<ReportItem[]>(INITIAL_REPORTS);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // The bell badge counts readings outside their band. It was pinned at 2.
-  const { readings } = usePlantInput();
-  const alarmCount = deriveAlarms(readings).length;
-
   // Modals & Drawers
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [selectedReportForDetail, setSelectedReportForDetail] = useState<ReportItem | null>(null);
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
   const [aiAssistantPrompt, setAiAssistantPrompt] = useState<string>('');
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -180,9 +172,7 @@ export default function App() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        onOpenNotifications={() => setIsNotificationsOpen(!isNotificationsOpen)}
         onOpenSettings={() => setCurrentTab('settings')}
-        unreadAlertsCount={alarmCount}
         onQuickRefresh={handleQuickRefresh}
         isRefreshing={isRefreshing}
         wakeWordSupported={wakeWord.isSupported}
@@ -242,12 +232,6 @@ export default function App() {
         wakeWordError={wakeWord.error}
       />
 
-      {/* Notifications Popover */}
-      <NotificationsModal
-        isOpen={isNotificationsOpen}
-        onClose={() => setIsNotificationsOpen(false)}
-        onNavigateToReadings={() => setCurrentTab('process-monitor')}
-      />
     </div>
   );
 }

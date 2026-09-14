@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { BarChart3, AlertTriangle } from 'lucide-react';
 import { usePlantFigures } from '../../hooks/usePlantFigures';
 import { TRAINED_MIN_TPD, TRAINED_MAX_TPD } from '../../hooks/usePlantInput';
+import { DataSourceBanner } from '../../components/DataSourceBanner';
 import {
   SWEEP_SERIES,
   barHeightPct,
@@ -9,7 +10,6 @@ import {
   sweepThroughput,
   type SweepMetric,
 } from '../../lib/throughputSweep';
-import { ReadingSourceBar } from '../../components/ReadingSourceBar';
 import type { TabType } from '../../types';
 
 /**
@@ -28,7 +28,7 @@ interface AnalyticsSectionProps {
 }
 
 export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ onNavigateTab }) => {
-  const { model, loading, error, grainInputTpd, readings, source, updatedAt } = usePlantFigures();
+  const { model, loading, error, grainInputTpd, readings, hasSubmitted, source, updatedAt } = usePlantFigures();
   const [metric, setMetric] = useState<SweepMetric>('distillationSteamKg');
 
   // Swept with the operator's other readings held at their current values, so
@@ -101,12 +101,13 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ onNavigateTa
           ))}
         </div>
       </div>
-
-      <ReadingSourceBar
-        grainInputTpd={grainInputTpd}
+      {/* Data source provenance banner */}
+      <DataSourceBanner
+        hasSubmitted={hasSubmitted}
         source={source}
         updatedAt={updatedAt}
-        onNavigateTab={onNavigateTab}
+        grainInputTpd={grainInputTpd}
+        onGoToProcessMonitor={onNavigateTab ? () => onNavigateTab('process-monitor') : undefined}
       />
 
       {/* The chart can only span what the network was trained on, so an operating

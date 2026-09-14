@@ -15,7 +15,16 @@
  * with the source data.
  */
 
+import { steamChain, energyBalance, BOILER_EFFICIENCY } from './thermalChain';
+
 export const ELECTRICITY_KG_CO2E_PER_KWH = 0.70;
+/**
+ * Retired as a calculation input, kept as the comparison point.
+ *
+ * This was recovered from the source dataset and reproduced its CO2e column to
+ * 0.006%, but it implies a boiler efficiency of 167%. Steam is now costed
+ * through lib/thermalChain.ts, which burns fuel to raise it like a real plant.
+ */
 export const DISTILLATION_STEAM_KG_CO2E_PER_KG = 0.06;
 export const DRYER_FUEL_KG_CO2E_PER_MMBTU = 53.0;
 
@@ -32,6 +41,16 @@ export interface ConsumptionInput {
 }
 
 export interface EmissionsResult {
+  /** Heat delivered by the process steam, MJ/day. */
+  steamThermalMj: number;
+  /** Fuel burnt to raise it, MJ/day. Higher than the heat delivered. */
+  steamFuelMj: number;
+  /** Effective kg CO2e per kg of steam from the chain, for comparison. */
+  steamEffectiveFactor: number;
+  /** Primary energy intensity, the headline figure. */
+  energyIntensityGjPerKl: number;
+  /** The same number in the unit a US dry mill quotes. */
+  energyIntensityBtuPerGal: number;
   electricityCo2eKg: number;
   steamCo2eKg: number;
   fuelCo2eKg: number;
@@ -60,12 +79,17 @@ export function ethanolProductionKl(grainInputTpd: number): number {
 export function computeEmissions(
   consumption: ConsumptionInput,
   grainInputTpd: number,
-  ethanolKlOverride?: number
+  ethanolKlOverride?: number,
+  /** Header pressure the steam is raised at. Sets its latent heat. */
+  headerPsi: number = 148.5,
+  boilerEfficiency: number = BOILER_EFFICIENCY
 ): EmissionsResult {
   const electricityCo2eKg =
     consumption.electricityKwh * ELECTRICITY_KG_CO2E_PER_KWH;
-  const steamCo2eKg =
-    consumption.distillationSteamKg * DISTILLATION_STEAM_KG_CO2E_PER_KG;
+  // Steam through the physical chain rather than a flat factor. See
+  // lib/thermalChain.ts for why the flat factor could not stay.
+  const steam = steamChain(consumption.distillationSteamKg, headerPsi, boilerEfficiency);
+  const steamCo2eKg = steam.co2eKg;
   const fuelCo2eKg = consumption.dryerFuelMmbtu * DRYER_FUEL_KG_CO2E_PER_MMBTU;
 
   const totalCo2eKg = electricityCo2eKg + steamCo2eKg + fuelCo2eKg;
@@ -74,13 +98,27 @@ export function computeEmissions(
       ? ethanolKlOverride
       : ethanolProductionKl(grainInputTpd);
 
-  // Fuel is already an energy figure, so it converts directly. Steam is a mass
-  // and is left out of the energy intensity rather than guessed at, since this
-  // dataset gives no boiler efficiency to convert it with.
+  // Every stream on one basis, steam included. The old intensity was kWh/kL and
+  // left steam out entirely because the dataset gave no boiler efficiency to
+  // convert a mass with -- so the largest thermal load on site was missing from
+  // the headline number. thermalChain names that efficiency instead.
+  const balance = energyBalance({
+    electricityKwh: consumption.electricityKwh,
+    steamKg: consumption.distillationSteamKg,
+    headerPsi,
+    dryerFuelMmbtu: consumption.dryerFuelMmbtu,
+    ethanolKl: production,
+    boilerEfficiency,
+  });
   const totalEnergyKwh =
     consumption.electricityKwh + consumption.dryerFuelMmbtu * KWH_PER_MMBTU;
 
   return {
+    steamThermalMj: steam.thermalMj,
+    steamFuelMj: steam.fuelMj,
+    steamEffectiveFactor: steam.effectiveFactorKgPerKg,
+    energyIntensityGjPerKl: balance.gjPerKl,
+    energyIntensityBtuPerGal: balance.btuPerGallon,
     electricityCo2eKg,
     steamCo2eKg,
     fuelCo2eKg,

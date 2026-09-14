@@ -82,14 +82,3 @@ export interface PlantMetric {
   hint?: string;
 }
 
-export interface AiOptimizationSetpoint {
-  id: string;
-  parameter: string;
-  unit: string;
-  currentValue: number;
-  recommendedValue: number;
-  expectedGain: string;
-  confidence: number;
-  safetyMargin: string;
-  status: 'pending' | 'applied' | 'dismissed';
-}

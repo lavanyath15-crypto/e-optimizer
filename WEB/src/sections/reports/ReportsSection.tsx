@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ReportItem, ReportCategory } from '../../types';
-import { PlusCircle, Eye, Download, Check, Loader2, RefreshCw, AlertTriangle, Filter, Sparkles } from 'lucide-react';
+import { ReportItem } from '../../types';
+import { REPORT_TEMPLATES } from './reportTemplates';
+import { PlusCircle, Eye, Download, Check, Loader2, RefreshCw, AlertTriangle, Filter, Sparkles, FileText } from 'lucide-react';
 
 interface ReportsSectionProps {
   reports: ReportItem[];
@@ -263,7 +264,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({
                 {report.status === 'generating' && (
                   <div className="w-full flex items-center justify-between px-2">
                     <div className="w-full h-10 bg-[#eceef1] rounded-md animate-pulse flex items-center justify-center text-xs text-[#767680] font-medium">
-                      Sample report, generating...
+                      Building from your current figures...
                     </div>
                   </div>
                 )}
@@ -284,7 +285,46 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({
         })}
       </div>
 
-      {filteredReports.length === 0 && (
+      {/* Nothing generated yet. Rather than seed the list with worked examples,
+          this shows the four reports the project can actually build, so the
+          screen still says what is on offer without inventing a single figure. */}
+      {reports.length === 0 && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-dashed border-[#c6c5d1] p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-[#0f6e8c]/10 flex items-center justify-center mx-auto mb-3 text-[#0f6e8c]">
+              <FileText className="w-6 h-6" />
+            </div>
+            <h4 className="font-bold text-lg text-[#061449]">Nothing generated yet</h4>
+            <p className="text-sm text-[#767680] mt-1 max-w-xl mx-auto leading-relaxed">
+              Reports are built from your figures at the moment you generate one, so there is
+              nothing here until you do. These four are what this project can produce.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {REPORT_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={onOpenGenerateModal}
+                className="text-left p-5 bg-white rounded-xl border border-[#e0e3e6] hover:border-[#0f6e8c]/50 hover:shadow-[0px_4px_20px_rgba(30,42,94,0.06)] transition-all cursor-pointer space-y-2"
+              >
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#767680]">
+                  {t.category}
+                </span>
+                <h5 className="font-bold text-base text-[#061449]">{t.title}</h5>
+                <p className="text-xs text-[#45464f] leading-relaxed">{t.description}</p>
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-[#0f6e8c] pt-1">
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Generate</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {reports.length > 0 && filteredReports.length === 0 && (
         <div className="text-center py-16 bg-white rounded-xl border border-dashed border-[#c6c5d1] p-8">
           <div className="w-12 h-12 rounded-full bg-[#eceef1] flex items-center justify-center mx-auto mb-3 text-[#767680]">
             <Filter className="w-6 h-6" />
@@ -309,9 +349,9 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-bold text-sm text-white">Not sure what Batch #408 is telling you?</h4>
+            <h4 className="font-bold text-sm text-white">Not sure what a report is telling you?</h4>
             <p className="text-xs text-[#dde1ff] mt-0.5">
-              The assistant can line up fermentation heat against your 150# header load and tell you what moved.
+              The assistant reads your live figures, so it can explain any number in a report and where it came from.
             </p>
           </div>
         </div>

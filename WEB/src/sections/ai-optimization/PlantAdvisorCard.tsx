@@ -1,10 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Bot, Loader2, AlertTriangle, Sparkles } from 'lucide-react';
-import { loadAnnModel, predictConsumption, AnnModel } from '../../lib/annModel';
 import {
-  computeEmissions,
-  ethanolProductionKl,
-  EmissionsResult,
   ELECTRICITY_KG_CO2E_PER_KWH,
   DISTILLATION_STEAM_KG_CO2E_PER_KG,
   DRYER_FUEL_KG_CO2E_PER_MMBTU,
@@ -12,60 +8,40 @@ import {
 import { getRecommendations } from '@backend/recommend.js';
 import type { DistillationScenarioPayload } from '@backend/recommend.js';
 import { DistillationScenarioResult } from '../../lib/distillationEngine';
-import {
-  usePlantInput,
-  TRAINED_MIN_TPD,
-  TRAINED_MAX_TPD,
-  GRAIN_INPUT_MIN_TPD,
-  GRAIN_INPUT_MAX_TPD,
-} from '../../hooks/usePlantInput';
+import { usePlantFigures } from '../../hooks/usePlantFigures';
+import { TRAINED_MIN_TPD, TRAINED_MAX_TPD } from '../../hooks/usePlantInput';
 
 interface PlantAdvisorCardProps {
   scenarios: DistillationScenarioResult[];
   currentRefluxRatio: number;
 }
 
+/**
+ * No input box here any more. Grain throughput, and every correction applied to
+ * it, comes from usePlantFigures() -- the same physics-corrected pipeline every
+ * other screen reads. This card used to load the network and call
+ * predictConsumption/computeEmissions on its own with the raw throughput, which
+ * meant it skipped the moisture, ABV, header-pressure and boiler corrections
+ * the rest of the dashboard applies: an operator with real readings entered saw
+ * one set of numbers on Carbon and a different, uncorrected set here.
+ */
 export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
   scenarios,
   currentRefluxRatio,
 }) => {
-  const [model, setModel] = useState<AnnModel | null>(null);
-  const [modelError, setModelError] = useState<string | null>(null);
-  // Shared with the scenario table and the assistant, so all three describe the
-  // same plant.
-  const { grainInputTpd: grainInput, setGrainInputTpd, isExtrapolating } = usePlantInput();
-  const [draft, setDraft] = useState<string | null>(null);
+  const {
+    model,
+    error: modelError,
+    grainInputTpd: grainInput,
+    isExtrapolating: extrapolating,
+    consumption,
+    emissions,
+  } = usePlantFigures();
 
   const [advice, setAdvice] = useState<string | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
   const [adviceError, setAdviceError] = useState<string | null>(null);
   const [isAsking, setIsAsking] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadAnnModel()
-      .then((m) => !cancelled && setModel(m))
-      .catch((err) => !cancelled && setModelError(err.message));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const consumption = model ? predictConsumption(model, grainInput) : null;
-  const emissions: EmissionsResult | null = consumption
-    ? computeEmissions(consumption, grainInput)
-    : null;
-
-  const extrapolating = isExtrapolating;
-
-  const commitGrainInput = (raw: string) => {
-    const parsed = parseFloat(raw);
-    // Clearing the box keeps the last reading rather than jumping to zero.
-    if (!Number.isNaN(parsed)) {
-      setGrainInputTpd(parsed);
-    }
-    setDraft(null);
-  };
 
   const askForRecommendations = async () => {
     if (!consumption || !emissions) return;
@@ -108,9 +84,9 @@ export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
       <div>
         <h3 className="text-base font-bold text-[#061449]">Consumption Model & Advisory</h3>
         <p className="text-xs text-[#767680] mt-1">
-          Tell it how much grain you're running. It predicts what you'll burn, converts that
-          to CO2e, then writes the whole thing up in plain English you can hand to a shift
-          supervisor.
+          Reads your grain throughput straight from Process Monitor, predicts what you'll burn,
+          converts that to CO2e, then writes the whole thing up in plain English you can hand to
+          a shift supervisor.
         </p>
       </div>
 
@@ -121,43 +97,19 @@ export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
         </div>
       )}
 
-      {/* Input */}
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="space-y-1.5">
-          <label htmlFor="advisor-grain" className="text-[11px] text-[#767680] block font-medium">
-            Grain Input
-          </label>
-          {/* Rounded for display. Throughput is derived from the milling feed
-              rate now rather than stored alongside it, so the raw figure carries
-              the full float tail: 140.2144734144. Typing here writes back into
-              that feed rate, which is why Process Monitor follows this box. */}
-          <div className="flex items-center gap-2">
-            <input
-              id="advisor-grain"
-              type="number"
-              inputMode="decimal"
-              min={GRAIN_INPUT_MIN_TPD}
-              max={GRAIN_INPUT_MAX_TPD}
-              step={0.1}
-              value={draft ?? grainInput.toFixed(1)}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={(e) => commitGrainInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur();
-              }}
-              className={`w-36 px-2.5 py-1.5 rounded-lg border font-mono text-base font-bold text-[#061449] focus:outline-none focus:ring-2 transition-colors ${
-                extrapolating
-                  ? 'border-[#FFB703] bg-[#FFB703]/5 focus:ring-[#FFB703]/30'
-                  : 'border-[#c6c5d1] focus:border-[#0f6e8c] focus:ring-[#0f6e8c]/20'
-              }`}
-            />
-            <span className="text-xs font-semibold text-[#767680]">t/day</span>
+      {/* Throughput, read-only. Submitting new readings on Process Monitor is
+          the only way to change it now. */}
+      {model && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-[#f7f9fc] rounded-lg border border-[#e0e3e6]">
+          <div>
+            <span className="text-[11px] text-[#767680] block">Grain Input</span>
+            <span className="text-xl font-bold font-mono text-[#061449]">
+              {grainInput.toFixed(1)}
+              <span className="text-xs font-semibold text-[#767680] ml-1.5">t/day</span>
+            </span>
           </div>
-        </div>
-
-        {model && (
           <p
-            className={`text-[11px] font-semibold pb-2 ${
+            className={`text-[11px] font-semibold ${
               extrapolating ? 'text-[#8a6100]' : 'text-[#2D6A4F]'
             }`}
           >
@@ -165,8 +117,8 @@ export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
               ? `Outside the trained range (${TRAINED_MIN_TPD} to ${TRAINED_MAX_TPD} t/day). The model is extrapolating.`
               : `Within the trained range (${TRAINED_MIN_TPD} to ${TRAINED_MAX_TPD} t/day).`}
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* What you'll burn */}
       {model && consumption && emissions && (
@@ -231,7 +183,7 @@ export const PlantAdvisorCard: React.FC<PlantAdvisorCardProps> = ({
               <div className="bg-[#f7f9fc] p-3.5 rounded-lg border border-[#e0e3e6]">
                 <span className="text-[11px] text-[#767680] block">Ethanol Production</span>
                 <span className="text-lg font-bold font-mono text-[#061449]">
-                  {ethanolProductionKl(grainInput).toFixed(2)}
+                  {emissions.ethanolProductionKl.toFixed(2)}
                 </span>
                 <span className="text-[11px] text-[#767680] ml-1">kL/day</span>
               </div>

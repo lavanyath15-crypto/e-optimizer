@@ -58,7 +58,12 @@ export function buildPlantState(
       }
     : baseline;
 
-  const emissions = computeEmissions(consumption, grainInputTpd, physics?.adjusted.ethanolKl);
+  const emissions = computeEmissions(
+    consumption,
+    grainInputTpd,
+    physics?.adjusted.ethanolKl,
+    options?.readings?.distillation.steamPressure
+  );
 
   // Screened at the same throughput as the predictions above, so the figures the
   // LLM receives are all on one basis.

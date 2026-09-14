@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ReportCategory, ReportItem } from '../../types';
+import { ReportItem } from '../../types';
 import { ASSETS } from '../../data/mockData';
 import { usePlantFigures } from '../../hooks/usePlantFigures';
 import { describeSource } from '../../hooks/usePlantInput';
@@ -7,8 +7,10 @@ import {
   DISTILLATION_SCENARIOS,
   classifyScenarios,
   evaluateScenario,
+  resolveCurrentScenario,
 } from '../../lib/distillationEngine';
-import { X, Calendar, FileText, Sparkles, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { REPORT_TEMPLATES, findTemplate } from './reportTemplates';
+import { X, FileText, Sparkles, ChevronDown, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface GenerateReportModalProps {
   isOpen: boolean;
@@ -23,13 +25,20 @@ function isoDaysAgo(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Builds a report from the live figures at the moment it is generated.
+ *
+ * The template list is the four reports this project can actually produce. The
+ * dropdown used to offer six, including a predictive maintenance log and a
+ * fermentation batch certification for things nothing here measures, and it
+ * filled whichever you picked with the same generic content.
+ */
 export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
   isOpen,
   onClose,
   onGenerate
 }) => {
-  const [reportTitle, setReportTitle] = useState('Daily Energy Consumables');
-  const [category, setCategory] = useState<ReportCategory>('OPERATIONS');
+  const [templateId, setTemplateId] = useState(REPORT_TEMPLATES[0].id);
   // Relative to today rather than fixed. These were hardcoded to a date in the
   // past, so the form opened on a stale range that drifted further out every day.
   const [startDate, setStartDate] = useState(() => isoDaysAgo(1));
@@ -38,179 +47,75 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
   const [includeAiAudit, setIncludeAiAudit] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { model, consumption, emissions, grainInputTpd, source, updatedAt } = usePlantFigures();
+  const {
+    model,
+    consumption,
+    emissions,
+    physics,
+    unmodelled,
+    grainInputTpd,
+    refluxRatio,
+    source,
+    updatedAt,
+  } = usePlantFigures();
+
+  const template = findTemplate(templateId);
 
   const scenarios = classifyScenarios(
     DISTILLATION_SCENARIOS.map((s) => evaluateScenario(s, grainInputTpd))
   );
-  const recommendedScenario = scenarios.find((s) => s.classification === 'Energy_Efficient');
+  const recommended = scenarios.find((s) => s.classification === 'Energy_Efficient');
+  const current = resolveCurrentScenario(scenarios, refluxRatio);
+
+  // Nothing can be built without the network, and a report of placeholders is
+  // exactly what this screen used to produce.
+  const canGenerate = Boolean(consumption && emissions && physics);
 
   if (!isOpen) return null;
 
-  const handleCategorySelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    setReportTitle(val);
-
-    if (val.includes('Carbon') || val.includes('Compliance')) {
-      setCategory('COMPLIANCE');
-    } else if (val.includes('Predictive') || val.includes('AI Insight')) {
-      setCategory('INTELLIGENCE');
-    } else {
-      setCategory('OPERATIONS');
-    }
-  };
-
-  // A report is a snapshot, so it captures the figures as they are now rather
-  // than recomputing later against a throughput the operator has since changed.
-  const liveMetrics: NonNullable<ReportItem['metricsSummary']> =
-    consumption && emissions
-      ? [
-          {
-            label: 'Grain Throughput',
-            value: `${grainInputTpd.toFixed(1)} t/day`,
-            change: describeSource(source, updatedAt),
-            isPositive: true,
-          },
-          {
-            label: 'Ethanol Production',
-            value: `${emissions.ethanolProductionKl.toFixed(2)} kL/day`,
-            change: 'grain x 390 L/t',
-            isPositive: true,
-          },
-          {
-            label: 'Process Electricity',
-            value: `${Math.round(consumption.electricityKwh).toLocaleString()} kWh/day`,
-            change: `R2 ${(model?.testR2['Total_Process_Electricity_kWh'] ?? 0).toFixed(2)}`,
-            isPositive: true,
-          },
-          {
-            label: 'Distillation Steam',
-            value: `${Math.round(consumption.distillationSteamKg).toLocaleString()} kg/day`,
-            change: `R2 ${(model?.testR2['Distillation_Steam_kg'] ?? 0).toFixed(2)} - weak`,
-            isPositive: false,
-          },
-          {
-            label: 'DDGS Dryer Fuel',
-            value: `${consumption.dryerFuelMmbtu.toFixed(1)} MMBtu/day`,
-            change: `R2 ${(model?.testR2['DDGS_Dryer_Fuel_MMBtu'] ?? 0).toFixed(2)} - weak`,
-            isPositive: false,
-          },
-          {
-            label: 'Operational CO2e Intensity',
-            value: `${emissions.co2eIntensityKgPerKl.toFixed(1)} kg CO2e/kL`,
-            change: 'operations only, not lifecycle',
-            isPositive: true,
-          },
-          {
-            label: 'Total Operational CO2e',
-            value: `${emissions.totalCo2eTonnes.toFixed(2)} t/day`,
-            change: 'electricity, steam and dryer fuel',
-            isPositive: true,
-          },
-        ]
-      : [
-          {
-            label: 'Model',
-            value: 'not loaded',
-            change: 'figures unavailable at generation time',
-            isPositive: false,
-          },
-        ];
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canGenerate) return;
     setIsSubmitting(true);
 
-    let iconUrl = ASSETS.energyIcon;
-    let iconType: ReportItem['iconType'] = 'energy';
-    if (category === 'COMPLIANCE') {
-      iconUrl = ASSETS.carbonIcon;
-      iconType = 'carbon';
-    } else if (category === 'INTELLIGENCE') {
-      iconUrl = ASSETS.aiIcon;
-      iconType = 'ai';
-    }
+    const iconUrl =
+      template.iconType === 'carbon'
+        ? ASSETS.carbonIcon
+        : template.iconType === 'ai'
+        ? ASSETS.aiIcon
+        : ASSETS.energyIcon;
+
+    const built = template.build({
+      model,
+      consumption: consumption!,
+      emissions: emissions!,
+      physics: physics!,
+      unmodelled,
+      grainInputTpd,
+      sourceNote: describeSource(source, updatedAt),
+      scenarios,
+      current,
+      recommended,
+      startDate,
+      endDate,
+    });
 
     const newReport: ReportItem = {
       id: `rep-${Date.now()}`,
-      title: reportTitle,
-      category: category,
-      description: `Custom ${format} report compiled for period ${startDate} to ${endDate} covering plant zone telemetry and AI audit.`,
+      title: template.title,
+      category: template.category,
+      description: template.description,
       status: 'generating',
       statusText: 'Est. 1 min remaining',
       generatedAt: 'Just now',
       fileFormat: format,
-      iconType: iconType,
+      iconType: template.iconType,
       customIconUrl: iconUrl,
       fileSize: format === 'PDF' ? '3.8 MB' : '1.4 MB',
-      // The figures on screen at the moment of generation. These were fixed
-      // placeholders ("142,800 dataset points", "97.2% plant efficiency") that
-      // never changed no matter what the operator had submitted.
-      metricsSummary: liveMetrics,
-      detailedData: {
-        executiveSummary:
-          consumption && emissions
-            ? `${reportTitle} for ${startDate} to ${endDate}, computed at ${grainInputTpd.toFixed(1)} t/day of grain. ` +
-              `At that throughput the network predicts ${Math.round(consumption.electricityKwh).toLocaleString()} kWh of process electricity, ` +
-              `${Math.round(consumption.distillationSteamKg).toLocaleString()} kg of distillation steam and ` +
-              `${consumption.dryerFuelMmbtu.toFixed(1)} MMBtu of dryer fuel per day, producing ` +
-              `${emissions.ethanolProductionKl.toFixed(2)} kL of ethanol at ${emissions.co2eIntensityKgPerKl.toFixed(1)} kg CO2e/kL. ` +
-              `Steam and dryer fuel carry weak held-out fits and should be read as indicative.`
-            : `${reportTitle}. The consumption model was not loaded when this was generated, so it carries no figures.`,
-        sections: [
-          {
-            title: 'Predicted consumption and derived intensities',
-            description:
-              'Predicted by the trained network from grain throughput, then converted using emission factors recovered from the source dataset. Operational energy only.',
-            tableHeaders: ['Measure', 'Value', 'Units', 'Basis'],
-            tableRows:
-              consumption && emissions
-                ? [
-                    ['Grain throughput', grainInputTpd.toFixed(1), 't/day', describeSource(source, updatedAt)],
-                    ['Ethanol production', emissions.ethanolProductionKl.toFixed(2), 'kL/day', 'Formula, grain x 390 L/t'],
-                    ['Process electricity', Math.round(consumption.electricityKwh).toLocaleString(), 'kWh/day', `Network, R2 ${(model?.testR2['Total_Process_Electricity_kWh'] ?? 0).toFixed(2)}`],
-                    ['Distillation steam', Math.round(consumption.distillationSteamKg).toLocaleString(), 'kg/day', `Network, R2 ${(model?.testR2['Distillation_Steam_kg'] ?? 0).toFixed(2)}, weak`],
-                    ['DDGS dryer fuel', consumption.dryerFuelMmbtu.toFixed(1), 'MMBtu/day', `Network, R2 ${(model?.testR2['DDGS_Dryer_Fuel_MMBtu'] ?? 0).toFixed(2)}, weak`],
-                    ['Operational CO2e intensity', emissions.co2eIntensityKgPerKl.toFixed(1), 'kg CO2e/kL', 'Recovered factors'],
-                    ['Energy intensity', emissions.totalEnergyIntensityKwhPerKl.toFixed(1), 'kWh/kL', 'Electricity plus dryer fuel'],
-                    ['Total operational CO2e', emissions.totalCo2eTonnes.toFixed(2), 't/day', 'Three sources summed'],
-                  ]
-                : [],
-            notes:
-              'Operational emissions only. Farming, fertiliser, grain transport and land use are excluded, so this is not a lifecycle carbon intensity and cannot be compared against an LCFS or GREET score.',
-          },
-          ...(recommendedScenario
-            ? [
-                {
-                  title: 'Distillation screening',
-                  description: `Screened against purity >= 99.5% and recovery >= 95% at ${grainInputTpd.toFixed(1)} t/day.`,
-                  tableHeaders: ['Scenario', 'Reflux', 'Steam (kg/day)', 'Specific (kg/kL)', 'Status'],
-                  tableRows: scenarios.map((s) => [
-                    s.id,
-                    s.refluxRatio.toFixed(2),
-                    Math.round(s.steamKgDay).toLocaleString(),
-                    s.specificSteamKgPerKl.toFixed(1),
-                    s.classification === 'Energy_Efficient'
-                      ? 'Recommended'
-                      : s.classification === 'Constraint_Violation'
-                      ? 'Violates limits'
-                      : 'Feasible',
-                  ]),
-                  notes: `Lowest-steam option clearing both limits is ${recommendedScenario.id} at reflux ${recommendedScenario.refluxRatio.toFixed(2)}. CO2e in this table uses a generic natural gas factor and is not on the same basis as the intensity above.`,
-                },
-              ]
-            : []),
-        ],
-        aiKeyFindings: includeAiAudit
-          ? [
-              `Computed at ${grainInputTpd.toFixed(1)} t/day, ${describeSource(source, updatedAt).toLowerCase()}.`,
-              recommendedScenario
-                ? `Distillation screening recommends ${recommendedScenario.id} at reflux ${recommendedScenario.refluxRatio.toFixed(2)}, the lowest-steam point meeting purity and recovery limits.`
-                : 'No distillation scenario met both the purity and recovery limits.',
-              'Steam and dryer fuel predictions carry held-out R2 below 0.5. Only grain throughput carries signal in the source dataset, so no other lever should be read as driving these figures.',
-            ]
-          : ['Generated without the model commentary.'],
-      }
+      metricsSummary: built.metricsSummary,
+      detailedData: includeAiAudit
+        ? built.detailedData
+        : built.detailedData && { ...built.detailedData, aiKeyFindings: ['Generated without the model commentary.'] },
     };
 
     setTimeout(() => {
@@ -256,24 +161,36 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
             {/* Form Group: Report Type */}
             <div>
               <label className="block text-sm font-semibold text-[#45464f] mb-2">
-                Report Category & Template
+                Report
               </label>
               <div className="relative">
                 <select
-                  value={reportTitle}
-                  onChange={handleCategorySelectChange}
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
                   className="w-full appearance-none bg-white border border-[#c6c5d1] rounded-lg px-4 py-3 text-sm text-[#061449] font-medium focus:border-[#061449] focus:ring-2 focus:ring-[#061449]/20 outline-none transition-colors cursor-pointer"
                 >
-                  <option value="Daily Energy Consumables">Daily Energy Consumables</option>
-                  <option value="Carbon Compliance (Scope 1 & 2)">Carbon Compliance (Scope 1 & 2)</option>
-                  <option value="Predictive Maintenance Log">Predictive Maintenance Log</option>
-                  <option value="Custom AI Insight Report">Custom AI Insight Report</option>
-                  <option value="Boiler Thermal & Steam Efficiency">Boiler Thermal & Steam Efficiency</option>
-                  <option value="Fermentation Batch Kinetics & Microbiology">Fermentation Batch Kinetics & Microbiology</option>
+                  {REPORT_TEMPLATES.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown className="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-[#767680] pointer-events-none" />
               </div>
+              <p className="text-[11px] text-[#767680] mt-1.5 leading-relaxed">
+                {template.description}
+              </p>
             </div>
+
+            {!canGenerate && (
+              <div className="flex items-start gap-2 p-3 bg-[#FFB703]/10 border border-[#FFB703]/40 rounded-lg text-xs text-[#8a6100]">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  The consumption model has not loaded, so there are no figures to build a report
+                  from. Nothing will be generated until it does.
+                </span>
+              </div>
+            )}
 
             {/* Form Group: Date Range */}
             <div>
@@ -388,7 +305,7 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !canGenerate}
               className="px-6 py-2.5 bg-[#061449] hover:bg-[#1e2a5e] text-white rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-2"
             >
               {isSubmitting ? (

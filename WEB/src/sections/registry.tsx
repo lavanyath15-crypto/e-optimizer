@@ -49,7 +49,7 @@ export interface SectionDefinition {
 export const SECTIONS: SectionDefinition[] = [
   {
     id: 'process-monitor',
-    render: () => <ProcessMonitorSection />,
+    render: (ctx) => <ProcessMonitorSection onNavigateTab={ctx.navigate} />,
   },
   {
     id: 'carbon',

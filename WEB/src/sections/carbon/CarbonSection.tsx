@@ -1,6 +1,7 @@
 import React from 'react';
-import { Leaf, Award, ShieldCheck, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { Leaf, ShieldCheck, AlertTriangle, ArrowUpRight } from 'lucide-react';
 import { usePlantFigures } from '../../hooks/usePlantFigures';
+import { DataSourceBanner } from '../../components/DataSourceBanner';
 import {
   ELECTRICITY_KG_CO2E_PER_KWH,
   DISTILLATION_STEAM_KG_CO2E_PER_KG,
@@ -12,8 +13,9 @@ import {
   evaluateScenario,
   resolveCurrentScenario,
 } from '../../lib/distillationEngine';
-import { ReadingSourceBar } from '../../components/ReadingSourceBar';
 import { ReadingsEffect } from '../../components/ReadingsEffect';
+import { Co2ReductionCard } from '../../components/Co2ReductionCard';
+import { BOILER_EFFICIENCY, impliedBoilerEfficiency } from '../../lib/thermalChain';
 import { TabType } from '../../types';
 
 interface CarbonSectionProps {
@@ -59,6 +61,9 @@ export const CarbonSection: React.FC<CarbonSectionProps> = ({ onNavigateTab }) =
   );
   const recommended = scenarios.find((s) => s.classification === 'Energy_Efficient');
   const current = hasSubmitted ? resolveCurrentScenario(scenarios, refluxRatio) : null;
+  // The reduction card does not wait for a submit: reflux has a value from the
+  // defaults, so the screening is real before the operator touches anything.
+  const scenarioNow = resolveCurrentScenario(scenarios, refluxRatio);
 
   // Positive means the recommended point uses less steam than the plant is using
   // now. It goes negative whenever the operator is running below the feasible
@@ -82,9 +87,13 @@ export const CarbonSection: React.FC<CarbonSectionProps> = ({ onNavigateTab }) =
             id: 'steam',
             label: 'Distillation Steam',
             co2eKg: emissions.steamCo2eKg,
-            basis: `${consumption.distillationSteamKg.toLocaleString(undefined, {
-              maximumFractionDigits: 0,
-            })} kg x ${DISTILLATION_STEAM_KG_CO2E_PER_KG} kg CO2e/kg`,
+            basis:
+              `${consumption.distillationSteamKg.toLocaleString(undefined, {
+                maximumFractionDigits: 0,
+              })} kg steam -> ${Math.round(emissions.steamThermalMj).toLocaleString()} MJ heat -> ` +
+              `${Math.round(emissions.steamFuelMj).toLocaleString()} MJ gas at ${(
+                BOILER_EFFICIENCY * 100
+              ).toFixed(0)}% boiler`,
           },
           {
             id: 'fuel',
@@ -118,27 +127,14 @@ export const CarbonSection: React.FC<CarbonSectionProps> = ({ onNavigateTab }) =
         </div>
       </div>
 
-      <ReadingSourceBar
-        grainInputTpd={grainInputTpd}
+      {/* Data source provenance banner */}
+      <DataSourceBanner
+        hasSubmitted={hasSubmitted}
         source={source}
         updatedAt={updatedAt}
-        onNavigateTab={onNavigateTab}
+        grainInputTpd={grainInputTpd}
+        onGoToProcessMonitor={onNavigateTab ? () => onNavigateTab('process-monitor') : undefined}
       />
-
-      {/* Scope, stated before any number. Operational is not lifecycle, and on
-          this screen the difference is the whole point. */}
-      <div className="flex items-start gap-2.5 p-3.5 bg-[#0f6e8c]/5 border border-[#0f6e8c]/25 rounded-xl text-xs text-[#0f6e8c]">
-        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-        <p className="leading-relaxed">
-          <strong className="font-bold">Operational emissions only.</strong> These figures cover
-          electricity, distillation steam and dryer fuel inside the plant. They are{' '}
-          <strong>not</strong> a lifecycle carbon intensity: farming, fertiliser, grain transport and
-          land use are excluded, and those dominate ethanol's real footprint. Do not compare this
-          against an LCFS, GREET or RED II score, and do not use it for credits. The emission factors
-          were recovered from the source dataset by least squares and reproduce its own CO2e column to
-          within 0.006%, but that dataset is synthetic.
-        </p>
-      </div>
 
       {error && (
         <div className="flex items-start gap-2 p-3.5 bg-[#BA1A1A]/5 border border-[#BA1A1A]/25 rounded-xl text-xs text-[#BA1A1A]">
@@ -151,43 +147,6 @@ export const CarbonSection: React.FC<CarbonSectionProps> = ({ onNavigateTab }) =
 
       {emissions && (
         <>
-          {/* Headline */}
-          <div className="bg-gradient-to-r from-[#001d23] via-[#00333d] to-[#061449] rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#abedff]">
-                <Award className="w-4 h-4" />
-                <span>Operational CO2e Intensity</span>
-              </div>
-              <div className="flex items-baseline gap-3 mt-2">
-                <span className="text-5xl font-extrabold font-mono text-white">
-                  {emissions.co2eIntensityKgPerKl.toFixed(1)}
-                </span>
-                <span className="text-sm font-bold text-[#abedff]">kg CO2e / kL ethanol</span>
-              </div>
-              <p className="text-xs text-[#dde1ff] mt-2 max-w-md">
-                {emissions.totalCo2eTonnes.toFixed(2)} t CO2e/day across{' '}
-                {emissions.ethanolProductionKl.toFixed(2)} kL of ethanol.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 w-full md:w-auto">
-              <div className="p-3 bg-white/10 rounded-xl backdrop-blur-xs border border-white/15">
-                <span className="text-[11px] text-[#abedff] block">Energy Intensity</span>
-                <span className="text-lg font-bold font-mono text-white">
-                  {emissions.totalEnergyIntensityKwhPerKl.toFixed(1)}
-                </span>
-                <span className="text-[11px] text-[#abedff] ml-1">kWh/kL</span>
-              </div>
-              <div className="p-3 bg-white/10 rounded-xl backdrop-blur-xs border border-white/15">
-                <span className="text-[11px] text-[#abedff] block">Electricity Intensity</span>
-                <span className="text-lg font-bold font-mono text-white">
-                  {emissions.electricityIntensityKwhPerKl.toFixed(1)}
-                </span>
-                <span className="text-[11px] text-[#abedff] ml-1">kWh/kL</span>
-              </div>
-            </div>
-          </div>
-
           {/* Where it comes from */}
           <div className="bg-white rounded-xl p-6 border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] space-y-5">
             <div className="flex items-center justify-between gap-4">
@@ -245,6 +204,71 @@ export const CarbonSection: React.FC<CarbonSectionProps> = ({ onNavigateTab }) =
                 {totalKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg CO2e/day
               </span>
             </div>
+          </div>
+
+          {/* Item 8: what is actually on the table, in CO2e. */}
+          <Co2ReductionCard
+            current={scenarioNow}
+            recommended={recommended}
+            totalCo2eKgDay={emissions.totalCo2eKg}
+          />
+
+          {/* The energy balance, in the unit an energy balance is quoted in. */}
+          <div className="bg-white rounded-xl p-6 border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-[#061449]">Energy intensity</h3>
+              <p className="text-xs text-[#767680] mt-0.5">
+                Primary energy into the plant per kL of ethanol, steam included as the gas burnt to
+                raise it.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <span className="text-[11px] text-[#767680] block">Energy Intensity</span>
+                <span className="text-2xl font-extrabold font-mono text-[#061449]">
+                  {emissions.energyIntensityGjPerKl.toFixed(2)}
+                </span>
+                <span className="text-[11px] text-[#767680] ml-1">GJ/kL</span>
+              </div>
+              <div>
+                <span className="text-[11px] text-[#767680] block">Same figure, US units</span>
+                <span className="text-2xl font-extrabold font-mono text-[#45464f]">
+                  {Math.round(emissions.energyIntensityBtuPerGal).toLocaleString()}
+                </span>
+                <span className="text-[11px] text-[#767680] ml-1">Btu/gal</span>
+              </div>
+              <div>
+                <span className="text-[11px] text-[#767680] block">Steam heat delivered</span>
+                <span className="text-2xl font-extrabold font-mono text-[#0f6e8c]">
+                  {Math.round(emissions.steamThermalMj / 1000).toLocaleString()}
+                </span>
+                <span className="text-[11px] text-[#767680] ml-1">GJ/day</span>
+              </div>
+              <div>
+                <span className="text-[11px] text-[#767680] block">Gas burnt to raise it</span>
+                <span className="text-2xl font-extrabold font-mono text-[#8a6100]">
+                  {Math.round(emissions.steamFuelMj / 1000).toLocaleString()}
+                </span>
+                <span className="text-[11px] text-[#767680] ml-1">GJ/day</span>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-[#767680] pt-2 border-t border-[#e0e3e6] leading-relaxed">
+              Steam used to be priced at a flat {DISTILLATION_STEAM_KG_CO2E_PER_KG} kg CO2e per kg,
+              recovered from the source dataset. That factor implies a boiler efficiency of{' '}
+              <strong className="font-mono">
+                {(impliedBoilerEfficiency(DISTILLATION_STEAM_KG_CO2E_PER_KG, 148.5) * 100).toFixed(0)}%
+              </strong>
+              , which is not possible: a boiler cannot return more heat than its fuel carries. Steam
+              now goes through the chain it stood in for, at an assumed{' '}
+              {(BOILER_EFFICIENCY * 100).toFixed(0)}% boiler efficiency, giving an effective{' '}
+              <strong className="font-mono">
+                {emissions.steamEffectiveFactor.toFixed(3)} kg CO2e/kg
+              </strong>
+              . The check on the whole thing is the Btu/gal above: a US dry mill runs 20,000 to
+              25,000. Replace the boiler efficiency with your own measured figure.
+            </p>
           </div>
 
           {/* Every reading other than throughput, and what it did to the

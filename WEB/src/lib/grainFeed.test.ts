@@ -52,56 +52,48 @@ describe('the milling field agrees with the model', () => {
   const milling = PROCESS_UNITS.find((u) => u.id === 'milling')!;
   const feedRate = milling.fields.find((f) => f.key === 'feedRate')!;
 
-  it('defaults to the nominal throughput used across the dashboard', () => {
-    const tpd = bushelsPerHourToTonnesPerDay(PROCESS_DEFAULTS.milling.feedRate);
-    expect(tpd).toBeGreaterThan(145);
-    expect(tpd).toBeLessThan(150);
+  it('is in tonnes per day, the unit the dataset and every screen use', () => {
+    // It was in bushels per hour, which made the one figure driving the whole
+    // dashboard the only one an operator had to convert in their head.
+    expect(feedRate.unit).toBe('t/day');
   });
 
-  it('has a normal band that lands inside the trained range', () => {
-    // The band used to be 3,000-3,800 bu/hr, about 2,100 t/day: a plant fourteen
-    // times the one in the dataset. Submitting it would have pushed the network
-    // far outside anything it had seen.
-    const low = bushelsPerHourToTonnesPerDay(feedRate.normalMin);
-    const high = bushelsPerHourToTonnesPerDay(feedRate.normalMax);
-
-    expect(low).toBeGreaterThanOrEqual(124.5);
-    expect(high).toBeLessThanOrEqual(165);
+  it('defaults to the dataset nominal exactly, with no conversion', () => {
+    expect(PROCESS_DEFAULTS.milling.feedRate).toBe(147.4);
   });
 
-  it('keeps the whole input range within what the model can be asked', () => {
-    // The hard bounds on this field are the plant's throughput bounds, because
-    // this field *is* the throughput. Capping tonnes downstream instead is what
-    // let the bushel reading on screen and the tonnage the rest of the dashboard
-    // ran on describe different plants.
-    expect(bushelsPerHourToTonnesPerDay(feedRate.min)).toBeGreaterThan(0);
-    expect(bushelsPerHourToTonnesPerDay(feedRate.max)).toBeCloseTo(400, 0);
+  it('has a normal band that is the trained range itself', () => {
+    expect(feedRate.normalMin).toBe(124.5);
+    expect(feedRate.normalMax).toBe(165);
+  });
+
+  it('bounds the input at something a plant could run', () => {
+    expect(feedRate.min).toBeGreaterThan(0);
+    expect(feedRate.max).toBe(400);
   });
 
   it('exposes the same bounds through the store as the field carries', () => {
-    expect(GRAIN_INPUT_MIN_TPD).toBeCloseTo(bushelsPerHourToTonnesPerDay(feedRate.min), 9);
-    expect(GRAIN_INPUT_MAX_TPD).toBeCloseTo(bushelsPerHourToTonnesPerDay(feedRate.max), 9);
-    expect(DEFAULT_GRAIN_INPUT_TPD).toBeCloseTo(
-      bushelsPerHourToTonnesPerDay(PROCESS_DEFAULTS.milling.feedRate),
-      9
-    );
+    expect(GRAIN_INPUT_MIN_TPD).toBe(feedRate.min);
+    expect(GRAIN_INPUT_MAX_TPD).toBe(feedRate.max);
+    expect(DEFAULT_GRAIN_INPUT_TPD).toBe(PROCESS_DEFAULTS.milling.feedRate);
   });
 });
 
 describe('throughputOf and refluxOf', () => {
   const readings: ProcessValues = {
-    milling: { feedRate: 230, moisture: 14.2, screenSize: 3.2 },
+    milling: { feedRate: 152.4, moisture: 14.2, screenSize: 3.2 },
     liquefaction: { cookTemp: 225.4, ph: 5.65, enzymeDose: 12.5 },
     fermentation: { abv: 14.82, temp: 89.2, durationH: 54 },
     distillation: { steamPressure: 148.5, refluxRatio: 2.3, feedRate: 1420 },
     drying: { throughput: 38.2, outletMoisture: 9.8, inletTemp: 410 },
   };
 
-  it('derives throughput from the milling feed rate rather than a stored copy', () => {
+  it('takes throughput straight from the milling reading', () => {
     // The regression this guards: throughput used to be stored beside the
     // readings, so the advisory card could change one without the other and
-    // Overview would show 242 bu/hr while Carbon computed a different tonnage.
-    expect(throughputOf(readings)).toBeCloseTo(bushelsPerHourToTonnesPerDay(230), 9);
+    // Overview would show one plant while Carbon computed another. It is now the
+    // reading itself, so there is no second copy and no conversion between them.
+    expect(throughputOf(readings)).toBe(152.4);
   });
 
   it('derives reflux from the beer column reading', () => {
