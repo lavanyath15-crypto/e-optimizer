@@ -39,16 +39,27 @@ const LEGACY_STORAGE_KEY = 'eoptimizer-grain-input';
 
 export type InputSource = 'default' | 'process-monitor' | 'advisor';
 
+/** unit id -> field key -> value, matching PROCESS_DEFAULTS in data/processUnits. */
+export type SubmittedReadings = Record<string, Record<string, number>>;
+
 export interface ProcessReadings {
   grainInputTpd: number;
   /** Beer column reflux, used to place the plant against the screened scenarios. */
   refluxRatio?: number;
+  /**
+   * Every reading as submitted. Overview shows these on its stage tiles, which
+   * were hardcoded sample values before and contradicted whatever the operator
+   * had actually entered two screens away.
+   */
+  readings?: SubmittedReadings;
 }
 
 export interface PlantInput {
   grainInputTpd: number;
   /** Null until readings are submitted on Process Monitor. */
   refluxRatio: number | null;
+  /** Every submitted reading, or null while still on the nominal default. */
+  readings: SubmittedReadings | null;
   /** Where the current figure came from. */
   source: InputSource;
   /** When it was last set, for display. Null while still on the default. */
@@ -65,6 +76,7 @@ export interface PlantInput {
 interface StoredState {
   grainInputTpd: number;
   refluxRatio: number | null;
+  readings: SubmittedReadings | null;
   source: InputSource;
   updatedAt: string | null;
 }
@@ -78,6 +90,7 @@ function clamp(value: number): number {
 const DEFAULT_STATE: StoredState = {
   grainInputTpd: DEFAULT_GRAIN_INPUT_TPD,
   refluxRatio: null,
+  readings: null,
   source: 'default',
   updatedAt: null,
 };
@@ -94,6 +107,8 @@ function readStored(): StoredState {
           refluxRatio: Number.isFinite(Number(parsed.refluxRatio))
             ? Number(parsed.refluxRatio)
             : null,
+          readings:
+            parsed.readings && typeof parsed.readings === 'object' ? parsed.readings : null,
           source: parsed.source ?? 'default',
           updatedAt: parsed.updatedAt ?? null,
         };
@@ -143,6 +158,7 @@ export function PlantInputProvider({ children }: { children: ReactNode }) {
       refluxRatio: Number.isFinite(readings.refluxRatio ?? NaN)
         ? (readings.refluxRatio as number)
         : prev.refluxRatio,
+      readings: readings.readings ?? prev.readings,
       source: 'process-monitor',
       updatedAt: stamp(),
     }));

@@ -46,15 +46,22 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateTab }) =
       maximumFractionDigits: series.decimals,
     });
 
-  // Marks where the operator is actually running on the curve.
-  const closestIndex = points.reduce(
-    (best, point, i) =>
-      Math.abs(point.grainInputTpd - grainInputTpd) <
-      Math.abs(points[best].grainInputTpd - grainInputTpd)
-        ? i
-        : best,
-    0
-  );
+  // Marks where the operator is actually running, but only when that point is
+  // on the chart. Without the range guard, a throughput of 400 t/day snapped to
+  // the nearest bar and painted "your current throughput" on 165, which is a
+  // wrong marker rather than a missing one.
+  const onChart = grainInputTpd >= TRAINED_MIN_TPD && grainInputTpd <= TRAINED_MAX_TPD;
+
+  const closestIndex = onChart
+    ? points.reduce(
+        (best, point, i) =>
+          Math.abs(point.grainInputTpd - grainInputTpd) <
+          Math.abs(points[best].grainInputTpd - grainInputTpd)
+            ? i
+            : best,
+        0
+      )
+    : -1;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -77,9 +84,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateTab }) =
             <button
               key={s.key}
               onClick={() => setMetric(s.key)}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                metric === s.key ? 'bg-[#061449] text-white' : 'text-[#45464f] hover:bg-[#eceef1]'
-              }`}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${metric === s.key ? 'bg-[#061449] text-white' : 'text-[#45464f] hover:bg-[#eceef1]'
+                }`}
             >
               {s.label}
             </button>
@@ -93,6 +99,23 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateTab }) =
         updatedAt={updatedAt}
         onNavigateTab={onNavigateTab}
       />
+
+      {/* The chart can only span what the network was trained on, so an operating
+          point outside that range genuinely has nowhere to sit on it. Saying so
+          beats silently dropping the marker. */}
+      {!onChart && !loading && (
+        <div className="flex items-start gap-2 p-3.5 bg-[#FFB703]/10 border border-[#FFB703]/40 rounded-xl text-xs text-[#8a6100]">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            You are running{' '}
+            <strong className="font-mono">{grainInputTpd.toFixed(1)} t/day</strong>, outside the
+            range this network was trained on ({TRAINED_MIN_TPD} to {TRAINED_MAX_TPD} t/day). The
+            curve below stops at {TRAINED_MAX_TPD}, so your operating point is off the chart and no
+            marker is shown. Predictions at your throughput are extrapolation: the shape of the
+            curve is still informative, the absolute values are not.
+          </span>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-start gap-2 p-3.5 bg-[#BA1A1A]/5 border border-[#BA1A1A]/25 rounded-xl text-xs text-[#BA1A1A]">
@@ -121,9 +144,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateTab }) =
 
             {r2 !== null && r2 !== undefined && (
               <span
-                className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                  r2 >= 0.5 ? 'bg-[#2D6A4F]/10 text-[#2D6A4F]' : 'bg-[#FFB703]/20 text-[#8a6100]'
-                }`}
+                className={`text-xs font-bold px-2.5 py-1 rounded-full ${r2 >= 0.5 ? 'bg-[#2D6A4F]/10 text-[#2D6A4F]' : 'bg-[#FFB703]/20 text-[#8a6100]'
+                  }`}
               >
                 Held-out R2 {r2.toFixed(2)}
                 {r2 < 0.5 && ' - weak'}
@@ -143,11 +165,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateTab }) =
                 >
                   <div
                     style={{ height: `${barHeightPct(value, range)}%` }}
-                    className={`w-full rounded-t-xs transition-all ${
-                      isCurrent
+                    className={`w-full rounded-t-xs transition-all ${isCurrent
                         ? 'bg-[#2D6A4F]'
                         : 'bg-gradient-to-t from-[#061449] to-[#0f6e8c] group-hover:to-[#4CC9F0]'
-                    }`}
+                      }`}
                   />
                   <span className="text-[9px] font-mono text-[#767680]">
                     {idx % 4 === 0 ? point.grainInputTpd.toFixed(0) : ''}
@@ -163,15 +184,21 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onNavigateTab }) =
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-[#767680]">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-xs bg-[#2D6A4F]" />
-              <span>
-                Your current throughput,{' '}
-                <strong className="font-mono text-[#061449]">
-                  {grainInputTpd.toFixed(1)} t/day
-                </strong>
+            {onChart ? (
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-xs bg-[#2D6A4F]" />
+                <span>
+                  Your current throughput,{' '}
+                  <strong className="font-mono text-[#061449]">
+                    {grainInputTpd.toFixed(1)} t/day
+                  </strong>
+                </span>
               </span>
-            </span>
+            ) : (
+              <span className="text-[#8a6100] font-semibold">
+                Your throughput is off this chart, so no marker is shown
+              </span>
+            )}
             <span>Grain throughput (t/day) along the bottom</span>
           </div>
 

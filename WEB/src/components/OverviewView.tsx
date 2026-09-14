@@ -4,16 +4,14 @@ import { TabType, ReportItem } from '../types';
 import { usePlantFigures } from '../hooks/usePlantFigures';
 import { buildPlantMetrics, formatMetricValue, isWeak } from '../lib/plantMetrics';
 import { ReadingSourceBar } from './ReadingSourceBar';
+import { usePlantInput } from '../hooks/usePlantInput';
 import {
-  AlertTriangle,
-  FileText,
-  Sparkles,
-  ArrowUpRight,
-  Gauge,
-  Droplets,
-  Flame,
-  Cpu
-} from 'lucide-react';
+  PROCESS_UNITS,
+  PROCESS_DEFAULTS,
+  isInBand,
+  formatValue,
+} from '../data/processUnits';
+import { AlertTriangle, FileText, Sparkles, ArrowUpRight } from 'lucide-react';
 
 interface OverviewViewProps {
   onNavigateTab: (tab: TabType) => void;
@@ -28,6 +26,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 }) => {
   const { model, consumption, emissions, loading, error, grainInputTpd, source, updatedAt } =
     usePlantFigures();
+  const { readings } = usePlantInput();
   const metrics =
     model && consumption && emissions ? buildPlantMetrics(consumption, emissions, model) : [];
 
@@ -150,102 +149,65 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </button>
           </div>
 
+          {/* Built from the same PROCESS_UNITS the Process Monitor uses, showing
+              whatever was last submitted. These were four hand-written tiles of
+              sample values that contradicted the operator's own readings two
+              screens away. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Stage 1 */}
-            <div className="p-4 bg-[#f7f9fc] rounded-xl border border-[#e0e3e6] space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-[#061449]">
-                <span className="flex items-center gap-1.5">
-                  <Gauge className="w-4 h-4 text-[#0f6e8c]" />
-                  1. Milling & Liquefaction
-                </span>
-                <span className="text-[#2D6A4F] font-mono">98.4% Conv</span>
-              </div>
-              <div className="space-y-1 text-xs text-[#45464f]">
-                <div className="flex justify-between">
-                  <span>Slurry Mash Temp:</span>
-                  <span className="font-mono font-bold text-[#061449]">185.4 °F</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Alpha-Amylase Dosing:</span>
-                  <span className="font-mono font-bold text-[#061449]">142 mL/min</span>
-                </div>
-              </div>
-              <div className="w-full bg-[#e0e3e6] h-1.5 rounded-full overflow-hidden">
-                <div className="bg-[#2D6A4F] h-full w-[98%]"></div>
-              </div>
-            </div>
+            {PROCESS_UNITS.map((unit) => {
+              const unitValues = readings?.[unit.id] ?? PROCESS_DEFAULTS[unit.id];
+              const outOfBand = unit.fields.filter((f) => !isInBand(f, unitValues[f.key]));
 
-            {/* Stage 2 */}
-            <div className="p-4 bg-[#f7f9fc] rounded-xl border border-[#e0e3e6] space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-[#061449]">
-                <span className="flex items-center gap-1.5">
-                  <Droplets className="w-4 h-4 text-[#4CC9F0]" />
-                  2. Fermentation Hall (F-01..08)
-                </span>
-                <span className="text-[#2D6A4F] font-mono">14.82% ABV</span>
-              </div>
-              <div className="space-y-1 text-xs text-[#45464f]">
-                <div className="flex justify-between">
-                  <span>Active Fermenters:</span>
-                  <span className="font-mono font-bold text-[#061449]">7 / 8 Online</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Cooling Water Delta:</span>
-                  <span className="font-mono font-bold text-[#061449]">4.2 °F (Safe)</span>
-                </div>
-              </div>
-              <div className="w-full bg-[#e0e3e6] h-1.5 rounded-full overflow-hidden">
-                <div className="bg-[#0f6e8c] h-full w-[88%]"></div>
-              </div>
-            </div>
+              return (
+                <div
+                  key={unit.id}
+                  className="p-4 bg-[#f7f9fc] rounded-xl border border-[#e0e3e6] space-y-2"
+                >
+                  <div className="flex items-center justify-between text-xs font-bold text-[#061449] gap-2">
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[#767680] shrink-0">{unit.step}.</span>
+                      <span className="truncate">{unit.name}</span>
+                    </span>
+                    <span
+                      className={`font-mono shrink-0 ${
+                        outOfBand.length === 0 ? 'text-[#2D6A4F]' : 'text-[#8a6100]'
+                      }`}
+                    >
+                      {outOfBand.length === 0
+                        ? 'in band'
+                        : `${outOfBand.length} out of band`}
+                    </span>
+                  </div>
 
-            {/* Stage 3 */}
-            <div className="p-4 bg-[#f7f9fc] rounded-xl border border-[#e0e3e6] space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-[#061449]">
-                <span className="flex items-center gap-1.5">
-                  <Flame className="w-4 h-4 text-[#FFB703]" />
-                  3. Distillation & Stripping
-                </span>
-                <span className="text-[#2D6A4F] font-mono">190 Proof</span>
-              </div>
-              <div className="space-y-1 text-xs text-[#45464f]">
-                <div className="flex justify-between">
-                  <span>Beer Column PSI:</span>
-                  <span className="font-mono font-bold text-[#061449]">14.8 PSI</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Reflux Ratio (current, S4):</span>
-                  <span className="font-mono font-bold text-[#061449]">3.1</span>
-                </div>
-              </div>
-              <div className="w-full bg-[#e0e3e6] h-1.5 rounded-full overflow-hidden">
-                <div className="bg-[#2D6A4F] h-full w-[96%]"></div>
-              </div>
-            </div>
+                  <div className="space-y-1 text-xs text-[#45464f]">
+                    {unit.fields.map((field) => (
+                      <div key={field.key} className="flex justify-between gap-2">
+                        <span className="truncate">{field.label}:</span>
+                        <span
+                          className={`font-mono font-bold shrink-0 ${
+                            isInBand(field, unitValues[field.key])
+                              ? 'text-[#061449]'
+                              : 'text-[#8a6100]'
+                          }`}
+                        >
+                          {formatValue(field, unitValues[field.key])}
+                          {field.unit && ` ${field.unit}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
 
-            {/* Stage 4 */}
-            <div className="p-4 bg-[#f7f9fc] rounded-xl border border-[#e0e3e6] space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-[#061449]">
-                <span className="flex items-center gap-1.5">
-                  <Cpu className="w-4 h-4 text-[#3d93ad]" />
-                  4. Molecular Sieve Dehydration
-                </span>
-                <span className="text-[#2D6A4F] font-mono">99.85% Pure</span>
-              </div>
-              <div className="space-y-1 text-xs text-[#45464f]">
-                <div className="flex justify-between">
-                  <span>Bed A / B Cycle:</span>
-                  <span className="font-mono font-bold text-[#061449]">Bed A Active (4m left)</span>
+                  <div className="w-full bg-[#e0e3e6] h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className={outOfBand.length === 0 ? 'bg-[#2D6A4F] h-full' : 'bg-[#FFB703] h-full'}
+                      style={{
+                        width: `${((unit.fields.length - outOfBand.length) / unit.fields.length) * 100}%`,
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>Specific Energy:</span>
-                  <span className="font-mono font-bold text-[#061449]">1.41 kWh/gal</span>
-                </div>
-              </div>
-              <div className="w-full bg-[#e0e3e6] h-1.5 rounded-full overflow-hidden">
-                <div className="bg-[#4CC9F0] h-full w-[99%]"></div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
 

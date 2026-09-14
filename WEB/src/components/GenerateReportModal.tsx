@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { ReportCategory, ReportItem } from '../types';
 import { ASSETS } from '../data/mockData';
+import { usePlantFigures } from '../hooks/usePlantFigures';
+import { describeSource } from '../hooks/usePlantInput';
+import {
+  DISTILLATION_SCENARIOS,
+  classifyScenarios,
+  evaluateScenario,
+} from '../lib/distillationEngine';
 import { X, Calendar, FileText, Sparkles, ChevronDown, CheckCircle2 } from 'lucide-react';
 
 interface GenerateReportModalProps {
@@ -31,6 +38,13 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
   const [includeAiAudit, setIncludeAiAudit] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { model, consumption, emissions, grainInputTpd, source, updatedAt } = usePlantFigures();
+
+  const scenarios = classifyScenarios(
+    DISTILLATION_SCENARIOS.map((s) => evaluateScenario(s, grainInputTpd))
+  );
+  const recommendedScenario = scenarios.find((s) => s.classification === 'Energy_Efficient');
+
   if (!isOpen) return null;
 
   const handleCategorySelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -45,6 +59,63 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
       setCategory('OPERATIONS');
     }
   };
+
+  // A report is a snapshot, so it captures the figures as they are now rather
+  // than recomputing later against a throughput the operator has since changed.
+  const liveMetrics: NonNullable<ReportItem['metricsSummary']> =
+    consumption && emissions
+      ? [
+          {
+            label: 'Grain Throughput',
+            value: `${grainInputTpd.toFixed(1)} t/day`,
+            change: describeSource(source, updatedAt),
+            isPositive: true,
+          },
+          {
+            label: 'Ethanol Production',
+            value: `${emissions.ethanolProductionKl.toFixed(2)} kL/day`,
+            change: 'grain x 390 L/t',
+            isPositive: true,
+          },
+          {
+            label: 'Process Electricity',
+            value: `${Math.round(consumption.electricityKwh).toLocaleString()} kWh/day`,
+            change: `R2 ${(model?.testR2['Total_Process_Electricity_kWh'] ?? 0).toFixed(2)}`,
+            isPositive: true,
+          },
+          {
+            label: 'Distillation Steam',
+            value: `${Math.round(consumption.distillationSteamKg).toLocaleString()} kg/day`,
+            change: `R2 ${(model?.testR2['Distillation_Steam_kg'] ?? 0).toFixed(2)} - weak`,
+            isPositive: false,
+          },
+          {
+            label: 'DDGS Dryer Fuel',
+            value: `${consumption.dryerFuelMmbtu.toFixed(1)} MMBtu/day`,
+            change: `R2 ${(model?.testR2['DDGS_Dryer_Fuel_MMBtu'] ?? 0).toFixed(2)} - weak`,
+            isPositive: false,
+          },
+          {
+            label: 'Operational CO2e Intensity',
+            value: `${emissions.co2eIntensityKgPerKl.toFixed(1)} kg CO2e/kL`,
+            change: 'operations only, not lifecycle',
+            isPositive: true,
+          },
+          {
+            label: 'Total Operational CO2e',
+            value: `${emissions.totalCo2eTonnes.toFixed(2)} t/day`,
+            change: 'electricity, steam and dryer fuel',
+            isPositive: true,
+          },
+        ]
+      : [
+          {
+            label: 'Model',
+            value: 'not loaded',
+            change: 'figures unavailable at generation time',
+            isPositive: false,
+          },
+        ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,31 +143,73 @@ export const GenerateReportModal: React.FC<GenerateReportModalProps> = ({
       iconType: iconType,
       customIconUrl: iconUrl,
       fileSize: format === 'PDF' ? '3.8 MB' : '1.4 MB',
-      metricsSummary: [
-        { label: 'Dataset Points', value: '142,800', change: '100% integrity', isPositive: true },
-        { label: 'Plant Efficiency', value: '97.2%', change: '+1.4%', isPositive: true },
-        { label: 'Audit Result', value: 'Compliant', change: 'Zero excursions', isPositive: true }
-      ],
+      // The figures on screen at the moment of generation. These were fixed
+      // placeholders ("142,800 dataset points", "97.2% plant efficiency") that
+      // never changed no matter what the operator had submitted.
+      metricsSummary: liveMetrics,
       detailedData: {
-        executiveSummary: `Generated telemetry log for ${reportTitle}. Analysis of continuous process historian data indicates operating setpoints adhered within 99.4% of engineered envelopes.`,
+        executiveSummary:
+          consumption && emissions
+            ? `${reportTitle} for ${startDate} to ${endDate}, computed at ${grainInputTpd.toFixed(1)} t/day of grain. ` +
+              `At that throughput the network predicts ${Math.round(consumption.electricityKwh).toLocaleString()} kWh of process electricity, ` +
+              `${Math.round(consumption.distillationSteamKg).toLocaleString()} kg of distillation steam and ` +
+              `${consumption.dryerFuelMmbtu.toFixed(1)} MMBtu of dryer fuel per day, producing ` +
+              `${emissions.ethanolProductionKl.toFixed(2)} kL of ethanol at ${emissions.co2eIntensityKgPerKl.toFixed(1)} kg CO2e/kL. ` +
+              `Steam and dryer fuel carry weak held-out fits and should be read as indicative.`
+            : `${reportTitle}. The consumption model was not loaded when this was generated, so it carries no figures.`,
         sections: [
           {
-            title: 'Telemetry Overview',
-            description: 'Automated synthesis across PLC channels and continuous emission monitoring systems.',
-            tableHeaders: ['Stream', 'Average Value', 'Engineering Units', 'Variance from Baseline'],
-            tableRows: [
-              ['Mash Slurry Mass Flow', '1,420', 'GPM', '+0.8%'],
-              ['Beer Column Feed Alcohol', '14.8', '% w/v', '+0.3%'],
-              ['150# Steam Consumption', '74.2', 'k-lbs/hr', '-2.4%'],
-              ['Regenerative Thermal Oxidizer', '1,540', '°F (Combustion Chamber)', 'Optimal']
-            ]
-          }
+            title: 'Predicted consumption and derived intensities',
+            description:
+              'Predicted by the trained network from grain throughput, then converted using emission factors recovered from the source dataset. Operational energy only.',
+            tableHeaders: ['Measure', 'Value', 'Units', 'Basis'],
+            tableRows:
+              consumption && emissions
+                ? [
+                    ['Grain throughput', grainInputTpd.toFixed(1), 't/day', describeSource(source, updatedAt)],
+                    ['Ethanol production', emissions.ethanolProductionKl.toFixed(2), 'kL/day', 'Formula, grain x 390 L/t'],
+                    ['Process electricity', Math.round(consumption.electricityKwh).toLocaleString(), 'kWh/day', `Network, R2 ${(model?.testR2['Total_Process_Electricity_kWh'] ?? 0).toFixed(2)}`],
+                    ['Distillation steam', Math.round(consumption.distillationSteamKg).toLocaleString(), 'kg/day', `Network, R2 ${(model?.testR2['Distillation_Steam_kg'] ?? 0).toFixed(2)}, weak`],
+                    ['DDGS dryer fuel', consumption.dryerFuelMmbtu.toFixed(1), 'MMBtu/day', `Network, R2 ${(model?.testR2['DDGS_Dryer_Fuel_MMBtu'] ?? 0).toFixed(2)}, weak`],
+                    ['Operational CO2e intensity', emissions.co2eIntensityKgPerKl.toFixed(1), 'kg CO2e/kL', 'Recovered factors'],
+                    ['Energy intensity', emissions.totalEnergyIntensityKwhPerKl.toFixed(1), 'kWh/kL', 'Electricity plus dryer fuel'],
+                    ['Total operational CO2e', emissions.totalCo2eTonnes.toFixed(2), 't/day', 'Three sources summed'],
+                  ]
+                : [],
+            notes:
+              'Operational emissions only. Farming, fertiliser, grain transport and land use are excluded, so this is not a lifecycle carbon intensity and cannot be compared against an LCFS or GREET score.',
+          },
+          ...(recommendedScenario
+            ? [
+                {
+                  title: 'Distillation screening',
+                  description: `Screened against purity >= 99.5% and recovery >= 95% at ${grainInputTpd.toFixed(1)} t/day.`,
+                  tableHeaders: ['Scenario', 'Reflux', 'Steam (kg/day)', 'Specific (kg/kL)', 'Status'],
+                  tableRows: scenarios.map((s) => [
+                    s.id,
+                    s.refluxRatio.toFixed(2),
+                    Math.round(s.steamKgDay).toLocaleString(),
+                    s.specificSteamKgPerKl.toFixed(1),
+                    s.classification === 'Energy_Efficient'
+                      ? 'Recommended'
+                      : s.classification === 'Constraint_Violation'
+                      ? 'Violates limits'
+                      : 'Feasible',
+                  ]),
+                  notes: `Lowest-steam option clearing both limits is ${recommendedScenario.id} at reflux ${recommendedScenario.refluxRatio.toFixed(2)}. CO2e in this table uses a generic natural gas factor and is not on the same basis as the intensity above.`,
+                },
+              ]
+            : []),
         ],
-        aiKeyFindings: [
-          includeAiAudit
-            ? 'Neural energy optimizer verified that shift 2 night tariff peak mitigation yielded optimal cost curve.'
-            : 'Standard threshold checks passed.'
-        ]
+        aiKeyFindings: includeAiAudit
+          ? [
+              `Computed at ${grainInputTpd.toFixed(1)} t/day, ${describeSource(source, updatedAt).toLowerCase()}.`,
+              recommendedScenario
+                ? `Distillation screening recommends ${recommendedScenario.id} at reflux ${recommendedScenario.refluxRatio.toFixed(2)}, the lowest-steam point meeting purity and recovery limits.`
+                : 'No distillation scenario met both the purity and recovery limits.',
+              'Steam and dryer fuel predictions carry held-out R2 below 0.5. Only grain throughput carries signal in the source dataset, so no other lever should be read as driving these figures.',
+            ]
+          : ['Generated without the model commentary.'],
       }
     };
 

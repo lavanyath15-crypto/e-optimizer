@@ -140,6 +140,16 @@ export const ProcessMonitorView: React.FC = () => {
       return values[unitId][fieldKey];
     };
 
+    // Snapshot of every field as submitted, drafts included, so other screens
+    // show what the operator entered rather than sample values.
+    const submitted: ProcessValues = {};
+    for (const u of PROCESS_UNITS) {
+      submitted[u.id] = {};
+      for (const field of u.fields) {
+        submitted[u.id][field.key] = readingOf(u.id, field.key);
+      }
+    }
+
     applyProcessReadings({
       // Bushels per hour off the mill scale is what an operator reads; tonnes
       // per day is what the network takes.
@@ -147,6 +157,7 @@ export const ProcessMonitorView: React.FC = () => {
       // Not a model input, but it places the plant against the screened
       // scenarios on the Carbon and AI Optimization screens.
       refluxRatio: readingOf('distillation', 'refluxRatio'),
+      readings: submitted,
     });
   };
 

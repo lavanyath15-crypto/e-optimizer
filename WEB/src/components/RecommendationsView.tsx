@@ -26,6 +26,12 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({ onNavi
   const [provider, setProvider] = useState<string | null>(null);
   const [adviceError, setAdviceError] = useState<string | null>(null);
   const [isAsking, setIsAsking] = useState(false);
+  // The throughput the visible advice was written for. Submitting new readings
+  // does not invalidate it automatically, and stale advice that still looks
+  // current is worse than none.
+  const [adviceTpd, setAdviceTpd] = useState<number | null>(null);
+
+  const isStale = advice !== null && adviceTpd !== null && Math.abs(adviceTpd - grainInputTpd) > 0.05;
 
   const generate = async () => {
     if (!model) return;
@@ -40,6 +46,7 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({ onNavi
     setAdvice(result.recommendations);
     setProvider(result.provider);
     setAdviceError(result.error);
+    if (result.recommendations) setAdviceTpd(grainInputTpd);
     setIsAsking(false);
   };
 
@@ -118,8 +125,30 @@ export const RecommendationsView: React.FC<RecommendationsViewProps> = ({ onNavi
       <DatasetAnalysisCard />
 
       {advice && (
-        <div className="bg-white rounded-xl border border-[#e0e3e6] shadow-[0px_4px_20px_rgba(30,42,94,0.04)] p-6 space-y-4">
-          <p className="text-sm text-[#191c1e] whitespace-pre-line leading-relaxed">{advice}</p>
+        <div
+          className={`bg-white rounded-xl border shadow-[0px_4px_20px_rgba(30,42,94,0.04)] p-6 space-y-4 ${
+            isStale ? 'border-[#FFB703]/60' : 'border-[#e0e3e6]'
+          }`}
+        >
+          {isStale && (
+            <div className="flex items-start gap-2 p-3 bg-[#FFB703]/10 border border-[#FFB703]/40 rounded-lg text-xs text-[#8a6100]">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                These were written for{' '}
+                <strong className="font-mono">{adviceTpd?.toFixed(1)} t/day</strong>, but you are now
+                running <strong className="font-mono">{grainInputTpd.toFixed(1)}</strong>. Regenerate
+                before acting on them.
+              </span>
+            </div>
+          )}
+
+          <p
+            className={`text-sm whitespace-pre-line leading-relaxed ${
+              isStale ? 'text-[#767680]' : 'text-[#191c1e]'
+            }`}
+          >
+            {advice}
+          </p>
 
           <div className="pt-3 border-t border-[#e0e3e6] space-y-2">
             {provider && (
