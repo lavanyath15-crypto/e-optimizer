@@ -28,12 +28,21 @@ interface AnalyticsSectionProps {
 }
 
 export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ onNavigateTab }) => {
-  const { model, loading, error, grainInputTpd, source, updatedAt } = usePlantFigures();
+  const { model, loading, error, grainInputTpd, readings, source, updatedAt } = usePlantFigures();
   const [metric, setMetric] = useState<SweepMetric>('distillationSteamKg');
 
+  // Swept with the operator's other readings held at their current values, so
+  // the curve and the marker are on the same basis as every other screen.
   const points = useMemo(
-    () => (model ? sweepThroughput(model, { min: TRAINED_MIN_TPD, max: TRAINED_MAX_TPD }) : []),
-    [model]
+    () =>
+      model
+        ? sweepThroughput(model, {
+            min: TRAINED_MIN_TPD,
+            max: TRAINED_MAX_TPD,
+            readings,
+          })
+        : [],
+    [model, readings]
   );
 
   const series = SWEEP_SERIES.find((s) => s.key === metric)!;

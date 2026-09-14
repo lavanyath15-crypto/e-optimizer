@@ -51,9 +51,16 @@ export function ethanolProductionKl(grainInputTpd: number): number {
   return (grainInputTpd * ETHANOL_YIELD_L_PER_TONNE_GRAIN) / 1000;
 }
 
+/**
+ * @param ethanolKlOverride Production corrected for grain moisture, when the
+ *   operator's readings supply it. The plain grain x 0.39 only holds at the
+ *   reference moisture, because the yield tracks dry matter. Omitted, this
+ *   behaves exactly as it always did.
+ */
 export function computeEmissions(
   consumption: ConsumptionInput,
-  grainInputTpd: number
+  grainInputTpd: number,
+  ethanolKlOverride?: number
 ): EmissionsResult {
   const electricityCo2eKg =
     consumption.electricityKwh * ELECTRICITY_KG_CO2E_PER_KWH;
@@ -62,7 +69,10 @@ export function computeEmissions(
   const fuelCo2eKg = consumption.dryerFuelMmbtu * DRYER_FUEL_KG_CO2E_PER_MMBTU;
 
   const totalCo2eKg = electricityCo2eKg + steamCo2eKg + fuelCo2eKg;
-  const production = ethanolProductionKl(grainInputTpd);
+  const production =
+    ethanolKlOverride !== undefined && Number.isFinite(ethanolKlOverride)
+      ? ethanolKlOverride
+      : ethanolProductionKl(grainInputTpd);
 
   // Fuel is already an energy figure, so it converts directly. Steam is a mass
   // and is left out of the energy intensity rather than guessed at, since this

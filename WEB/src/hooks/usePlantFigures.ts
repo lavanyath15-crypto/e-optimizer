@@ -12,6 +12,12 @@ import { loadAnnModel, predictConsumption, type AnnModel, type ConsumptionPredic
 import { computeEmissions, type EmissionsResult } from '../lib/emissionsFormula';
 import { usePlantInput, type InputSource } from './usePlantInput';
 import type { ProcessValues } from '../data/processUnits';
+import {
+  applyProcessPhysics,
+  unmodelledReadings,
+  type PhysicsResult,
+  type UnmodelledReading,
+} from '../lib/processPhysics';
 
 export interface PlantFigures {
   model: AnnModel | null;
@@ -29,9 +35,19 @@ export interface PlantFigures {
   source: InputSource;
   updatedAt: string | null;
   isExtrapolating: boolean;
-  /** Null until the model is available. */
+  /**
+   * Consumption after the operator's readings are applied to the network's
+   * prediction. This is what every screen shows.
+   */
   consumption: ConsumptionPrediction | null;
   emissions: EmissionsResult | null;
+  /**
+   * The network's own output before the readings, and the itemised corrections
+   * between the two. Null until the model is available.
+   */
+  physics: PhysicsResult | null;
+  /** Readings that are recorded but do not move a number, with the reason. */
+  unmodelled: UnmodelledReading[];
 }
 
 export function usePlantFigures(): PlantFigures {
@@ -65,8 +81,26 @@ export function usePlantFigures(): PlantFigures {
     };
   }, []);
 
-  const consumption = model ? predictConsumption(model, grainInputTpd) : null;
-  const emissions = consumption ? computeEmissions(consumption, grainInputTpd) : null;
+  // Network first, then the operator's readings on top of it. At the default
+  // readings every correction is exactly 1, so this is the network's own output
+  // and the dataset reconciliation is untouched.
+  const baseline = model ? predictConsumption(model, grainInputTpd) : null;
+  const physics = baseline
+    ? applyProcessPhysics(baseline, grainInputTpd, readings)
+    : null;
+
+  const consumption: ConsumptionPrediction | null = physics
+    ? {
+        electricityKwh: physics.adjusted.electricityKwh,
+        distillationSteamKg: physics.adjusted.distillationSteamKg,
+        dryerFuelMmbtu: physics.adjusted.dryerFuelMmbtu,
+      }
+    : null;
+
+  const emissions =
+    consumption && physics
+      ? computeEmissions(consumption, grainInputTpd, physics.adjusted.ethanolKl)
+      : null;
 
   return {
     model,
@@ -81,5 +115,7 @@ export function usePlantFigures(): PlantFigures {
     isExtrapolating,
     consumption,
     emissions,
+    physics,
+    unmodelled: unmodelledReadings(readings),
   };
 }

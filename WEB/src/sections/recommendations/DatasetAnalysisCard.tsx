@@ -30,7 +30,7 @@ import { analyseDataset as askModel } from '@backend/recommend.js';
  * anyway.
  */
 export const DatasetAnalysisCard: React.FC = () => {
-  const { model, grainInputTpd } = usePlantFigures();
+  const { model, grainInputTpd, readings } = usePlantFigures();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [summary, setSummary] = useState<DatasetSummary | null>(null);
@@ -92,7 +92,7 @@ export const DatasetAnalysisCard: React.FC = () => {
 
     const result = await askModel(
       summaryForPrompt(summary),
-      buildPlantState(model, grainInputTpd)
+      buildPlantState(model, grainInputTpd, { readings })
     );
 
     setAdvice(result.recommendations);

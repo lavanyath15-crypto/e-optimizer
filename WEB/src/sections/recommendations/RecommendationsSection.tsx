@@ -20,7 +20,7 @@ interface RecommendationsSectionProps {
  * only the numbers it is given.
  */
 export const RecommendationsSection: React.FC<RecommendationsSectionProps> = ({ onNavigateTab }) => {
-  const { model, loading, error, grainInputTpd } = usePlantFigures();
+  const { model, loading, error, grainInputTpd, readings } = usePlantFigures();
 
   const [advice, setAdvice] = useState<string | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export const RecommendationsSection: React.FC<RecommendationsSectionProps> = ({ 
     setAdviceError(null);
     setProvider(null);
 
-    const result = await getRecommendations(buildPlantState(model, grainInputTpd));
+    const result = await getRecommendations(buildPlantState(model, grainInputTpd, { readings }));
 
     setAdvice(result.recommendations);
     setProvider(result.provider);

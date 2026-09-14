@@ -82,7 +82,12 @@ export const PROCESS_UNITS: ProcessUnit[] = [
       // which anchors this column at reflux 2.3 to 3.1. Change them together or the
       // two screens will disagree about what the plant is running.
       { key: 'refluxRatio', label: 'Reflux Ratio', unit: '', min: 0.5, max: 5, step: 0.01, normalMin: 2.3, normalMax: 3.1, decimals: 2 },
-      { key: 'feedRate', label: 'Beer Feed Rate', unit: 'GPM', min: 0, max: 3000, step: 10, normalMin: 1300, normalMax: 1550, decimals: 0 },
+      // 1,300-1,550 GPM was here, with a 1,420 default. Beer flow is fixed by
+      // how much ethanol you make and how strong it is: 147.5 t/day of grain at
+      // 14.82% ABV is 71 GPM, so the old band described a plant 19.9x this one
+      // -- about 2,936 t/day, the same oversized template the milling feed rate
+      // came from. The band below is 124.5-165 t/day across a 13.5-16% ABV.
+      { key: 'feedRate', label: 'Beer Feed Rate', unit: 'GPM', min: 1, max: 300, step: 0.5, normalMin: 55, normalMax: 90, decimals: 1 },
     ],
   },
   {
@@ -91,7 +96,10 @@ export const PROCESS_UNITS: ProcessUnit[] = [
     name: 'Dryers & DDGS',
     equipment: 'RTO & Flash Dryers',
     fields: [
-      { key: 'throughput', label: 'Dryer Throughput', unit: 'TPH', min: 0, max: 80, step: 0.1, normalMin: 34, normalMax: 42, decimals: 1 },
+      // 34-42 TPH was here, with a 38.2 default: the same 19.9x error. A bushel
+      // of corn leaves about 17.5 lb of DDGS, so 147.5 t/day of grain is 1.9 TPH
+      // off the dryer. The band below is the 124.5-165 t/day training range.
+      { key: 'throughput', label: 'Dryer Throughput', unit: 'TPH', min: 0.1, max: 20, step: 0.01, normalMin: 1.6, normalMax: 2.2, decimals: 2 },
       { key: 'outletMoisture', label: 'DDGS Outlet Moisture', unit: '%', min: 0, max: 30, step: 0.1, normalMin: 8, normalMax: 11, decimals: 1 },
       { key: 'inletTemp', label: 'Dryer Inlet Temperature', unit: '°F', min: 100, max: 700, step: 1, normalMin: 380, normalMax: 450, decimals: 0 },
     ],
@@ -107,9 +115,12 @@ export const PROCESS_DEFAULTS: ProcessValues = {
   milling: { feedRate: 242, moisture: 14.2, screenSize: 3.2 },
   liquefaction: { cookTemp: 225.4, ph: 5.65, enzymeDose: 12.5 },
   fermentation: { abv: 14.82, temp: 89.2, durationH: 54 },
-  // refluxRatio matches scenario S4, the current operating point in distillationEngine.
-  distillation: { steamPressure: 148.5, refluxRatio: 3.1, feedRate: 1420 },
-  drying: { throughput: 38.2, outletMoisture: 9.8, inletTemp: 410 },
+  // refluxRatio matches scenario S4, the current operating point in
+  // distillationEngine. feedRate is the beer flow implied by 147.5 t/day of
+  // grain at 14.82% ABV, so the cross-check on the Carbon screen starts clean.
+  distillation: { steamPressure: 148.5, refluxRatio: 3.1, feedRate: 71.2 },
+  // 1.92 TPH is 147.5 t/day of grain at 17.5 lb DDGS per 56 lb bushel.
+  drying: { throughput: 1.92, outletMoisture: 9.8, inletTemp: 410 },
 };
 
 export function isInBand(field: ProcessField, value: number): boolean {

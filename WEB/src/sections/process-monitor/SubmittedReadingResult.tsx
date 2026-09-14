@@ -27,7 +27,7 @@ interface SubmittedReadingResultProps {
 export const SubmittedReadingResult: React.FC<SubmittedReadingResultProps> = ({
   enteredRefluxRatio,
 }) => {
-  const { model, consumption, emissions, loading, error, grainInputTpd, isExtrapolating } =
+  const { model, consumption, emissions, loading, error, grainInputTpd, readings, isExtrapolating } =
     usePlantFigures();
 
   const [advice, setAdvice] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export const SubmittedReadingResult: React.FC<SubmittedReadingResultProps> = ({
     setProvider(null);
 
     const result = await getRecommendations(
-      buildPlantState(model, grainInputTpd, { refluxRatio: enteredRefluxRatio, scenarios })
+      buildPlantState(model, grainInputTpd, { refluxRatio: enteredRefluxRatio, scenarios, readings })
     );
 
     setAdvice(result.recommendations);

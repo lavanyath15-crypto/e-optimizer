@@ -13,6 +13,8 @@
 
 import { predictConsumption, type AnnModel } from './annModel';
 import { computeEmissions } from './emissionsFormula';
+import { applyProcessPhysics } from './processPhysics';
+import type { ProcessValues } from '../data/processUnits';
 
 export interface SweepPoint {
   grainInputTpd: number;
@@ -69,12 +71,19 @@ export const SWEEP_SERIES: SeriesDefinition[] = [
  *
  * Defaults span the training range. Outside it the network extrapolates, which
  * is exactly where a chart would mislead most, so callers have to opt in.
+ *
+ * `readings` holds the operator's other entries at their current values while
+ * throughput is swept, so the curve describes the plant they are running rather
+ * than the reference one. Without it this chart plotted the raw network while
+ * every other screen showed the corrected figures, and the operator's own
+ * throughput landed above the top of the axis: the exact disagreement between
+ * screens this dashboard is supposed to have stopped having.
  */
 export function sweepThroughput(
   model: AnnModel,
-  options: { min?: number; max?: number; steps?: number } = {}
+  options: { min?: number; max?: number; steps?: number; readings?: ProcessValues } = {}
 ): SweepPoint[] {
-  const { min = 124.5, max = 165, steps = 24 } = options;
+  const { min = 124.5, max = 165, steps = 24, readings } = options;
 
   if (steps < 2 || max <= min) return [];
 
@@ -83,8 +92,25 @@ export function sweepThroughput(
 
   for (let i = 0; i < steps; i++) {
     const grainInputTpd = min + stride * i;
-    const consumption = predictConsumption(model, grainInputTpd);
-    const emissions = computeEmissions(consumption, grainInputTpd);
+    const baseline = predictConsumption(model, grainInputTpd);
+
+    const physics = readings
+      ? applyProcessPhysics(baseline, grainInputTpd, readings)
+      : null;
+
+    const consumption = physics
+      ? {
+          electricityKwh: physics.adjusted.electricityKwh,
+          distillationSteamKg: physics.adjusted.distillationSteamKg,
+          dryerFuelMmbtu: physics.adjusted.dryerFuelMmbtu,
+        }
+      : baseline;
+
+    const emissions = computeEmissions(
+      consumption,
+      grainInputTpd,
+      physics?.adjusted.ethanolKl
+    );
 
     points.push({
       grainInputTpd,

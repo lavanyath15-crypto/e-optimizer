@@ -13,6 +13,8 @@ import {
   classifyScenarios,
   DistillationScenarioResult,
 } from './distillationEngine';
+import { applyProcessPhysics } from './processPhysics';
+import type { ProcessValues } from '../data/processUnits';
 
 export function toScenarioPayload(
   scenarios: DistillationScenarioResult[]
@@ -31,10 +33,32 @@ export function toScenarioPayload(
 export function buildPlantState(
   model: AnnModel,
   grainInputTpd: number,
-  options?: { refluxRatio?: number; scenarios?: DistillationScenarioResult[] }
+  options?: {
+    refluxRatio?: number;
+    scenarios?: DistillationScenarioResult[];
+    /**
+     * The operator's other readings. Supplied, the figures sent to the model are
+     * the corrected ones the screens show. Without this the assistant answered
+     * questions about the network's raw output while the operator was looking at
+     * numbers up to 14% away from it.
+     */
+    readings?: ProcessValues;
+  }
 ): PlantState {
-  const consumption = predictConsumption(model, grainInputTpd);
-  const emissions = computeEmissions(consumption, grainInputTpd);
+  const baseline = predictConsumption(model, grainInputTpd);
+  const physics = options?.readings
+    ? applyProcessPhysics(baseline, grainInputTpd, options.readings)
+    : null;
+
+  const consumption = physics
+    ? {
+        electricityKwh: physics.adjusted.electricityKwh,
+        distillationSteamKg: physics.adjusted.distillationSteamKg,
+        dryerFuelMmbtu: physics.adjusted.dryerFuelMmbtu,
+      }
+    : baseline;
+
+  const emissions = computeEmissions(consumption, grainInputTpd, physics?.adjusted.ethanolKl);
 
   // Screened at the same throughput as the predictions above, so the figures the
   // LLM receives are all on one basis.

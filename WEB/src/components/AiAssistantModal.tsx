@@ -81,7 +81,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
   const [provider, setProvider] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // The throughput the operator actually set, not a nominal constant.
-  const { grainInputTpd } = usePlantInput();
+  const { grainInputTpd, readings } = usePlantInput();
 
   // handleUserSend is declared below and closes over current state, so the voice
   // callback reaches it through a ref rather than forcing a reorder.
@@ -155,7 +155,7 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setIsTyping(true);
 
     const reply = model
-      ? await askAssistant(text, buildPlantState(model, grainInputTpd), history)
+      ? await askAssistant(text, buildPlantState(model, grainInputTpd, { readings }), history)
       : {
           recommendations: null,
           provider: null,

@@ -13,6 +13,7 @@ import {
   resolveCurrentScenario,
 } from '../../lib/distillationEngine';
 import { ReadingSourceBar } from '../../components/ReadingSourceBar';
+import { ReadingsEffect } from '../../components/ReadingsEffect';
 import { TabType } from '../../types';
 
 interface CarbonSectionProps {
@@ -45,6 +46,8 @@ export const CarbonSection: React.FC<CarbonSectionProps> = ({ onNavigateTab }) =
     hasSubmitted,
     source,
     updatedAt,
+    physics,
+    unmodelled,
   } = usePlantFigures();
 
   // Where the submitted reflux sits against the screened scenarios, and what the
@@ -243,6 +246,18 @@ export const CarbonSection: React.FC<CarbonSectionProps> = ({ onNavigateTab }) =
               </span>
             </div>
           </div>
+
+          {/* Every reading other than throughput, and what it did to the
+              figures above. */}
+          {physics && (
+            <ReadingsEffect
+              physics={physics}
+              unmodelled={unmodelled}
+              onNavigateToReadings={
+                onNavigateTab ? () => onNavigateTab('process-monitor') : undefined
+              }
+            />
+          )}
 
           {/* The reflux submitted on Process Monitor, priced against the
               screened alternatives. Steam is the largest single source above, so
